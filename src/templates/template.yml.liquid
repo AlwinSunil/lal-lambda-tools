@@ -1,0 +1,12 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Resources:
+  {{ resourceName }}:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: {% if language == "python" %}lambda_function.lambda_handler{% else %}index.handler{% endif %}
+      Runtime: {% if language == "python" %}python3.9{% else %}nodejs20.x{% endif %}
+      Timeout: 3 # Timeout in seconds
+      MemorySize: 128 # Memory size in MB

@@ -1,0 +1,50 @@
+import { Runtime } from "@aws-sdk/client-lambda";
+
+export type SupportedLanguage = "python" | "nodejs";
+
+export interface CreateOptions {
+  language: SupportedLanguage;
+  output: string;
+}
+
+export interface DeployOptions {
+  profile: string;
+  region: string;
+  functionName?: string;
+  role?: string;
+  statusOnly?: boolean;
+}
+
+export interface SAMTemplate {
+  Resources: Record<string, SAMResource>;
+}
+
+export interface SAMResource {
+  Type: string;
+  Properties: {
+    CodeUri: string;
+    Handler: string;
+    Runtime: Runtime;
+    Timeout: number;
+    MemorySize: number;
+  };
+}
+
+export interface LambdaFunctionConfig {
+  functionName: string;
+  runtime: Runtime;
+  handler: string;
+  timeout: number;
+  memorySize: number;
+  roleArn: string;
+  zipBuffer: Buffer;
+}
+
+export interface ParsedSAMTemplate {
+  functionName: string;
+  runtime: Runtime;
+  handler: string;
+  timeout: number;
+  memorySize: number;
+  codeUri: string;
+}

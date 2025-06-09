@@ -1,0 +1,47 @@
+# {{ name }}
+
+A Lambda function created with LiveAltLife Lambda Tools.
+
+## Overview
+
+This is a {{ language }} Lambda function template with direct AWS deployment (no CloudFormation/SAM required).
+
+## Structure
+
+- `{% if language == "python" %}lambda_function.py{% else %}index.js{% endif %}` - Main Lambda function code
+- `template.yaml` - Function configuration template
+- `README.md` - This file
+
+## Development
+
+### Prerequisites
+
+- AWS CLI configured
+- {% if language == "python" %}Python{% else %}Node.js{% endif %}
+
+### Deployment
+
+Using the LAL Lambda Tools (recommended):
+
+```bash
+# Deploy with default profile
+npx lal-lambda-tools deploy
+
+# Deploy with specific profile and region
+npx lal-lambda-tools deploy --profile my-profile --region us-west-2
+
+# Deploy with custom function name
+npx lal-lambda-tools deploy --function-name my-custom-name
+
+# Deploy with existing IAM role
+npx lal-lambda-tools deploy --role arn:aws:iam::123456789012:role/my-lambda-role
+```
+
+## Function Details
+
+The Lambda function:
+- Returns a simple JSON response
+- Includes basic logging
+- Uses {% if language == "python" %}Python{% else %}Node.js{% endif %} runtime
+- 3-second timeout (configurable in template.yaml)
+- Direct deployment without CloudFormation stack

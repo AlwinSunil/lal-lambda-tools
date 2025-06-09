@@ -1,0 +1,41 @@
+{
+  "name": "lal-lambda-tools",
+  "version": "0.1.0",
+  "description": "LiveAltLife Lambda tools for template creation and deployment",
+  "main": "dist/index.js",
+  "bin": {
+    "lal-lambda-tools": "./dist/index.js"
+  },
+  "files": [
+    "dist/**/*",
+    "README.md"
+  ],
+  "scripts": {
+    "dev": "nodemon --exec npx tsx src/index.ts",
+    "dev:watch": "nodemon --watch src --ext ts --exec tsx src/index.ts",
+    "build": "tsc && cp -r src/templates/*.liquid dist/templates/",
+    "start": "node dist/index.js",
+    "link": "npm link",
+    "unlink": "npm unlink -g"
+  },
+  "author": "LiveAltLife",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@aws-sdk/client-lambda": "^3.825.0",
+    "@aws-sdk/credential-providers": "^3.825.0",
+    "adm-zip": "^0.5.16",
+    "chalk": "^5.4.1",
+    "commander": "^14.0.0",
+    "fs-extra": "^11.3.0",
+    "liquidjs": "^10.21.1",
+    "ora": "^8.2.0",
+    "yaml": "^2.8.0"
+  },
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^22.15.29",
+    "nodemon": "^3.1.10",
+    "typescript": "^5.8.3"
+  }
+}
