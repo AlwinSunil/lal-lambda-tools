@@ -29,7 +29,8 @@
     "fs-extra": "^11.3.0",
     "liquidjs": "^10.21.1",
     "ora": "^8.2.0",
-    "yaml": "^2.8.0"
+    "yaml": "^2.8.0",
+    "zod": "^3.25.56"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.7",

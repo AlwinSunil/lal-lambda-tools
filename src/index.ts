@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 
-import { Command } from "commander";
 import chalk from "chalk";
+import { Command } from "commander";
 
 import { createTemplate } from "./commands/create-template";
 import { deployLambda } from "./commands/deploy";
-
 import { CreateOptions, DeployOptions } from "./types/app";
 
 const program = new Command();

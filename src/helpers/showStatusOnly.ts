@@ -1,5 +1,6 @@
 import chalk from "chalk";
 import { Ora } from "ora";
+
 import { LambdaClient } from "@aws-sdk/client-lambda";
 
 import { checkFunctionStatus } from "./checkFunctionStatus";

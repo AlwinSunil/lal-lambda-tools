@@ -1,8 +1,8 @@
-import path from "path";
 import fs from "fs/promises";
-import fse from "fs-extra";
+import path from "path";
 
 import AdmZip from "adm-zip";
+import fse from "fs-extra";
 
 export async function createDeploymentPackage(codeUri: string): Promise<Buffer> {
   const codeDir: string = path.resolve(codeUri);

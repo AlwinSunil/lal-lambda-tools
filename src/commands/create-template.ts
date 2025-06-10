@@ -1,80 +1,139 @@
+#!/usr/bin/env node
+
 import fs from "fs/promises";
-import fse from "fs-extra";
 import path from "path";
 
 import chalk from "chalk";
+import fse from "fs-extra";
 import { Liquid } from "liquidjs";
 import ora from "ora";
+import { z } from "zod";
 
 import { SupportedLanguage } from "../types/app";
+import { generateResourceName } from "../helpers/generateResourceName";
 
-function toPascalCase(name: string): string {
-  return name
-    .split(/[-_\s]+/) // Split on hyphens, underscores, and spaces
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join("");
-}
+// Zod schema for create template validation
+const CreateTemplateSchema = z.object({
+  name: z
+    .string()
+    .min(1, "Function name is required and cannot be empty")
+    .regex(/^[a-zA-Z0-9_-]+$/, "Function name can only contain letters, numbers, hyphens, and underscores")
+    .max(128, "Function name cannot exceed 64 characters"),
+  language: z.enum(["python", "nodejs"], {
+    errorMap: () => ({ message: 'Language must be either "python" or "nodejs"' }),
+  }),
+  output: z
+    .string()
+    .min(1, "Output directory is required")
+    .refine((path) => !path.includes(".."), "Output path cannot contain '..' for security reasons"),
+});
 
-function generateResourceName(name: string): string {
-  const pascalName = toPascalCase(name);
-  if (pascalName.toLowerCase().endsWith("function")) {
-    return pascalName;
-  }
-  return `${pascalName}Function`;
-}
+type CreateTemplateInput = z.infer<typeof CreateTemplateSchema>;
 
 async function createTemplate(name: string, language: SupportedLanguage, output: string): Promise<void> {
+  // Validate inputs using Zod schema
+  const validationResult = CreateTemplateSchema.safeParse({
+    name: name?.trim(),
+    language,
+    output,
+  });
+
+  if (!validationResult.success) {
+    const errorMessages = validationResult.error.errors.map((err) => err.message);
+    throw new Error(`Validation failed: ${errorMessages.join(", ")}`);
+  }
+
+  const { name: validatedName, language: validatedLanguage, output: validatedOutput } = validationResult.data;
+  const projectDir = path.resolve(validatedOutput, validatedName);
+
+  // Check if directory already exists
+  const dirExists = await fse.pathExists(projectDir);
+  if (dirExists) {
+    const dirStat = await fse.stat(projectDir);
+    if (dirStat.isDirectory()) {
+      const dirContents = await fse.readdir(projectDir);
+      if (dirContents.length > 0) {
+        throw new Error(`Directory '${projectDir}' already exists and is not empty`);
+      }
+    } else {
+      throw new Error(`A file with the name '${validatedName}' already exists at the specified location`);
+    }
+  }
+
   const spinner = ora("Creating Lambda template...").start();
 
   try {
-    if (!["python", "nodejs"].includes(language)) {
-      throw new Error('Language must be either "python" or "nodejs"');
-    }
-
-    const projectDir = path.join(output, name);
-
     await fse.ensureDir(projectDir);
 
-    const engine = new Liquid({
-      root: path.resolve(__dirname, "../templates"),
-      extname: ".liquid",
-    });
+    const templateRoot = path.resolve(__dirname, "../templates");
+    const templatesExist = await fse.pathExists(templateRoot);
+    if (!templatesExist) {
+      throw new Error(`Template directory not found at: ${templateRoot}`);
+    }
 
     spinner.text = "Creating function files...";
 
-    if (language === "python") {
-      const pythonContent = await engine.renderFile("lambda_function.py.liquid", { name, language });
-      await fs.writeFile(path.join(projectDir, "lambda_function.py"), pythonContent);
-    } else {
-      const nodeContent = await engine.renderFile("index.js.liquid", { name, language });
-      await fs.writeFile(path.join(projectDir, "index.js"), nodeContent);
+    const engine = new Liquid({
+      root: templateRoot,
+      extname: ".liquid",
+    });
 
-      const packageJsonContent = await engine.renderFile("package.json.liquid", { name, language });
-      await fs.writeFile(path.join(projectDir, "package.json"), packageJsonContent);
+    try {
+      if (validatedLanguage === "python") {
+        const pythonContent = await engine.renderFile("lambda_function.py.liquid", {
+          name: validatedName,
+          language: validatedLanguage,
+        });
+        await fs.writeFile(path.join(projectDir, "lambda_function.py"), pythonContent);
+      }
+
+      if (validatedLanguage === "nodejs") {
+        const nodeContent = await engine.renderFile("index.js.liquid", {
+          name: validatedName,
+          language: validatedLanguage,
+        });
+        await fs.writeFile(path.join(projectDir, "index.js"), nodeContent);
+
+        const packageJsonContent = await engine.renderFile("package.json.liquid", {
+          name: validatedName,
+          language: validatedLanguage,
+        });
+        await fs.writeFile(path.join(projectDir, "package.json"), packageJsonContent);
+      }
+
+      const resourceName = generateResourceName(validatedName);
+
+      const templateContent = await engine.renderFile("template.yml.liquid", {
+        resourceName,
+        language: validatedLanguage,
+      });
+      await fs.writeFile(path.join(projectDir, "template.yaml"), templateContent);
+
+      const gitignoreContent = await engine.renderFile("gitignore.liquid");
+      await fs.writeFile(path.join(projectDir, ".gitignore"), gitignoreContent);
+
+      const readmeContent = await engine.renderFile("README.md.liquid", {
+        name: validatedName,
+        language: validatedLanguage,
+      });
+      await fs.writeFile(path.join(projectDir, "README.md"), readmeContent);
+    } catch (fileError) {
+      try {
+        await fse.remove(projectDir);
+      } catch (cleanupError) {
+        console.warn(chalk.yellow(`Warning: Failed to clean up directory after error: ${cleanupError}`));
+      }
+      throw new Error(`Failed to create template files: ${fileError}`);
     }
 
-    // Render template.yaml using Liquid
-    const resourceName = generateResourceName(name);
+    spinner.text = "Finalizing template creation...";
+    spinner.succeed(chalk.green(`Lambda template '${validatedName}' created successfully!`));
 
-    const templateContent = await engine.renderFile("template.yml.liquid", {
-      resourceName,
-      language,
-    });
-    await fs.writeFile(path.join(projectDir, "template.yaml"), templateContent);
-
-    const gitignoreContent = await engine.renderFile("gitignore.liquid");
-    await fs.writeFile(path.join(projectDir, ".gitignore"), gitignoreContent);
-
-    const readmeContent = await engine.renderFile("README.md.liquid", { name, language });
-    await fs.writeFile(path.join(projectDir, "README.md"), readmeContent);
-
-    spinner.text = "Creating additional files...";
-    spinner.succeed(chalk.green(`Lambda template '${name}' created successfully!`));
-
+    // Success output - controlled and structured
     console.log(`\n${chalk.blue("📁 Created files:")}`);
     console.log(`   ${projectDir}/`);
-    console.log(`   ├── ${language === "python" ? "lambda_function.py" : "index.js"}`);
-    if (language === "nodejs") {
+    console.log(`   ├── ${validatedLanguage === "python" ? "lambda_function.py" : "index.js"}`);
+    if (validatedLanguage === "nodejs") {
       console.log("   ├── package.json");
     }
     console.log("   ├── template.yaml");
@@ -82,7 +141,7 @@ async function createTemplate(name: string, language: SupportedLanguage, output:
     console.log("   └── README.md");
 
     console.log(`\n${chalk.blue("🚀 Next steps:")}`);
-    console.log(`   cd ${name}`);
+    console.log(`   cd ${validatedName}`);
     console.log("   npx lal-lambda-tools deploy");
   } catch (error) {
     spinner.fail("Failed to create Lambda template");

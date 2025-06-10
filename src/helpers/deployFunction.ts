@@ -1,15 +1,15 @@
-import { LambdaFunctionConfig } from "../types/app";
+import chalk from "chalk";
 
 import {
+  CreateFunctionCommand,
   LambdaClient,
   UpdateFunctionCodeCommand,
   UpdateFunctionConfigurationCommand,
-  CreateFunctionCommand,
 } from "@aws-sdk/client-lambda";
-import chalk from "chalk";
 
 import { checkFunctionStatus } from "./checkFunctionStatus";
 import { waitForFunctionUpdate } from "./waitForFunctionUpdate";
+import { LambdaFunctionConfig } from "../types/app";
 
 async function checkIfFunctionExists(lambdaClient: LambdaClient, functionName: string): Promise<boolean> {
   console.log(chalk.yellow(`🔍 Checking if function exists: ${functionName}`));

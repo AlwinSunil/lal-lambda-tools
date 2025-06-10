@@ -16,17 +16,19 @@ export interface DeployOptions {
 }
 
 export interface SAMTemplate {
+  AWSTemplateFormatVersion?: string;
+  Transform?: string;
   Resources: Record<string, SAMResource>;
 }
 
 export interface SAMResource {
   Type: string;
-  Properties: {
-    CodeUri: string;
-    Handler: string;
-    Runtime: Runtime;
-    Timeout: number;
-    MemorySize: number;
+  Properties?: {
+    CodeUri?: string;
+    Handler?: string;
+    Runtime?: Runtime;
+    Timeout?: number;
+    MemorySize?: number;
   };
 }
 
