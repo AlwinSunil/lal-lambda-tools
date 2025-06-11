@@ -6,11 +6,7 @@ function toPascalCase(name: string): string {
 }
 
 function generateResourceName(name: string): string {
-  const pascalName = toPascalCase(name);
-  if (pascalName.toLowerCase().endsWith("function")) {
-    return pascalName;
-  }
-  return `${pascalName}Function`;
+  return toPascalCase(name);
 }
 
 export { generateResourceName };

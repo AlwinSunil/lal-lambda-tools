@@ -9,16 +9,16 @@ import { Liquid } from "liquidjs";
 import ora from "ora";
 import { z } from "zod";
 
-import { SupportedLanguage } from "../types/app";
 import { generateResourceName } from "../helpers/generateResourceName";
+import { SupportedLanguage } from "../types/app";
 
 // Zod schema for create template validation
 const CreateTemplateSchema = z.object({
   name: z
     .string()
-    .min(1, "Function name is required and cannot be empty")
-    .regex(/^[a-zA-Z0-9_-]+$/, "Function name can only contain letters, numbers, hyphens, and underscores")
-    .max(128, "Function name cannot exceed 64 characters"),
+    .min(1, "Function name is required")
+    .max(64, "Function name cannot exceed 64 characters")
+    .regex(/^[A-Z][A-Za-z0-9]*$/, "Function name must be PascalCase as it will be used as a resource name in template.yml"),
   language: z.enum(["python", "nodejs"], {
     errorMap: () => ({ message: 'Language must be either "python" or "nodejs"' }),
   }),
