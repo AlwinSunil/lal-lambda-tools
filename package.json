@@ -22,6 +22,7 @@
   "license": "UNLICENSED",
   "dependencies": {
     "@aws-sdk/client-lambda": "^3.825.0",
+    "@aws-sdk/client-sts": "^3.826.0",
     "@aws-sdk/credential-providers": "^3.825.0",
     "adm-zip": "^0.5.16",
     "chalk": "^5.4.1",

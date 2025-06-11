@@ -14,6 +14,7 @@ import { fromIni } from "@aws-sdk/credential-providers";
 import { createDeploymentPackage } from "../helpers/createDeploymentPackage";
 import { deployFunction } from "../helpers/deployFunction";
 import { showStatusOnly } from "../helpers/showStatusOnly";
+import { validateDeployOptions } from "../helpers/validateDeployOptions";
 import { DeployOptions, LambdaFunctionConfig, ParsedSAMTemplate, SAMTemplate } from "../types/app";
 import { validateTemplate, formatValidationErrors } from "../helpers/validateTemplate";
 
@@ -63,6 +64,9 @@ async function createLambdaClient(options: DeployOptions): Promise<LambdaClient>
 }
 
 async function deployLambda(options: DeployOptions) {
+  // Validate deploy options first
+  await validateDeployOptions(options);
+  
   const spinner = ora("Preparing deployment...\n").start();
 
   try {
