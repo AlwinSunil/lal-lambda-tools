@@ -5,7 +5,8 @@ import { Command } from "commander";
 
 import { createTemplate } from "./commands/create-template";
 import { deployLambda } from "./commands/deploy";
-import { CreateOptions, DeployOptions } from "./types/app";
+import { fetchLambda } from "./commands/fetch";
+import { CreateOptions, DeployOptions, FetchOptions } from "./types/app";
 
 const program = new Command();
 
@@ -19,10 +20,12 @@ program
 ${chalk.cyan("Quick Start:")}
   ${chalk.green("lal-lambda-tools create my-function")}   Create Python function in current directory
   ${chalk.green("lal-lambda-tools deploy")}               Deploy function from current directory
+  ${chalk.green("lal-lambda-tools fetch my-function")}    Download function from AWS
 
 ${chalk.cyan("Commands:")}
   ${chalk.white("create <name>")}                        Create new Lambda function template
   ${chalk.white("deploy")}                              Deploy Lambda function to AWS
+  ${chalk.white("fetch <name>")}                        Download Lambda function from AWS
 
 ${chalk.cyan("Common Options:")}
   ${chalk.white("-l, --language <type>")}               Language: python (default) | nodejs
@@ -91,6 +94,38 @@ ${chalk.cyan("Requirements:")}
       await deployLambda(options);
     } catch (error) {
       console.error(chalk.red(`❌ ${options.statusOnly ? "Status check failed" : "Deployment failed"}: ${error}`));
+      process.exit(1);
+    }
+  });
+
+// Fetch command
+program
+  .command("fetch")
+  .description("Download Lambda function from AWS")
+  .argument("<name>", "Function name")
+  .option("-p, --profile <name>", "AWS CLI profile (default: default)", "default")
+  .option("-r, --region <region>", "AWS region (default: us-east-2)", "us-east-2")
+  .option("-o, --output <directory>", "Output directory (default: current directory)", ".")
+  .addHelpText(
+    "after",
+    `
+${chalk.cyan("Examples:")}
+  ${chalk.green("lal-lambda-tools fetch user-auth")}                 Download function to current directory
+  ${chalk.green("lal-lambda-tools fetch api-gateway -p production")} Use specific AWS profile
+  ${chalk.green("lal-lambda-tools fetch processor -r eu-west-1")}     Download from specific region
+  ${chalk.green("lal-lambda-tools fetch my-func -o ./functions")}     Download to specific directory
+
+${chalk.cyan("Requirements:")}
+  ${chalk.white("•")} Valid AWS credentials configured
+  ${chalk.white("•")} Function must exist in specified region
+  ${chalk.white("•")} Appropriate IAM permissions to read Lambda functions
+`,
+  )
+  .action(async (name: string, options: FetchOptions) => {
+    try {
+      await fetchLambda(name, options);
+    } catch (error) {
+      console.error(chalk.red(`❌ Error fetching function: ${error}`));
       process.exit(1);
     }
   });

@@ -15,6 +15,12 @@ export interface DeployOptions {
   statusOnly?: boolean;
 }
 
+export interface FetchOptions {
+  profile: string;
+  region: string;
+  output: string;
+}
+
 export interface SAMTemplate {
   AWSTemplateFormatVersion?: string;
   Transform?: string;
