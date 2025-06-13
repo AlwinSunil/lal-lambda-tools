@@ -43,6 +43,7 @@ program
   .argument("<name>", "Function name")
   .option("-l, --language <type>", "Language (default: python)", "python")
   .option("-o, --output <directory>", "Output directory (default: current directory)", ".")
+  .option("--layers <arns...>", "Layer ARNs to attach to the function")
   .addHelpText(
     "after",
     `
@@ -50,6 +51,9 @@ ${chalk.cyan("Examples:")}
   ${chalk.green("lal-lambda-tools create user-auth")}                Create Python function in current directory
   ${chalk.green("lal-lambda-tools create api-gateway -l nodejs")}    Create Node.js function
   ${chalk.green("lal-lambda-tools create processor -o ./functions")} Create in specific directory
+  ${chalk.green(
+    "lal-lambda-tools create my-lambda --layers arn:aws:lambda:us-east-1:123456789012:layer:my-layer:1 arn:aws:lambda:us-east-1:123456789012:layer:another-layer:3",
+  )} Create Python function with layers
 
 ${chalk.cyan("Languages:")}
   ${chalk.white("python")}    Python 3.9+ (default)
@@ -58,7 +62,7 @@ ${chalk.cyan("Languages:")}
   )
   .action(async (name: string, options: CreateOptions) => {
     try {
-      await createTemplate(name, options.language, options.output);
+      await createTemplate(name, options.language, options.output, options.layers);
     } catch (error) {
       console.error(chalk.red(`❌ Error creating template: ${error}`));
       process.exit(1);

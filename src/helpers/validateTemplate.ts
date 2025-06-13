@@ -29,6 +29,9 @@ const SAMResourcePropertiesSchema = z.object({
     .min(128, "MemorySize must be at least 128 MB")
     .max(10240, "MemorySize cannot exceed 10240 MB")
     .refine((val) => val % 64 === 0, "MemorySize must be a multiple of 64 MB"),
+  Layers: z
+    .array(z.string().regex(/^arn:aws:lambda:.+:.+:layer:.+:\d+$/, "Layer ARN must be in the correct format"))
+    .optional(),
 });
 
 const SAMResourceSchema = z.object({

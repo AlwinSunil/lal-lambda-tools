@@ -26,16 +26,18 @@ const CreateTemplateSchema = z.object({
     .string()
     .min(1, "Output directory is required")
     .refine((path) => !path.includes(".."), "Output path cannot contain '..' for security reasons"),
+  layers: z.array(z.string()).optional(),
 });
 
 type CreateTemplateInput = z.infer<typeof CreateTemplateSchema>;
 
-async function createTemplate(name: string, language: SupportedLanguage, output: string): Promise<void> {
+async function createTemplate(name: string, language: SupportedLanguage, output: string, layers?: string[]): Promise<void> {
   // Validate inputs using Zod schema
   const validationResult = CreateTemplateSchema.safeParse({
     name: name?.trim(),
     language,
     output,
+    layers,
   });
 
   if (!validationResult.success) {
@@ -43,7 +45,12 @@ async function createTemplate(name: string, language: SupportedLanguage, output:
     throw new Error(`Validation failed: ${errorMessages.join(", ")}`);
   }
 
-  const { name: validatedName, language: validatedLanguage, output: validatedOutput } = validationResult.data;
+  const {
+    name: validatedName,
+    language: validatedLanguage,
+    output: validatedOutput,
+    layers: validatedLayers,
+  } = validationResult.data;
   const projectDir = path.resolve(validatedOutput, validatedName);
 
   // Check if directory already exists
@@ -106,8 +113,9 @@ async function createTemplate(name: string, language: SupportedLanguage, output:
       const templateContent = await engine.renderFile("template.yml.liquid", {
         resourceName,
         language: validatedLanguage,
+        layers: validatedLayers,
       });
-      await fs.writeFile(path.join(projectDir, "template.yaml"), templateContent);
+      await fs.writeFile(path.join(projectDir, "template.yml"), templateContent);
 
       const gitignoreContent = await engine.renderFile("gitignore.liquid");
       await fs.writeFile(path.join(projectDir, ".gitignore"), gitignoreContent);

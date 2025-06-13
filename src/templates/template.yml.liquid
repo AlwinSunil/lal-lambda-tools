@@ -10,3 +10,9 @@ Resources:
       Runtime: {% if language == "python" %}python3.9{% else %}nodejs20.x{% endif %}
       Timeout: 3 # Timeout in seconds
       MemorySize: 128 # Memory size in MB
+{%- if layers %}
+      Layers:
+{%- for layer in layers %}
+        - {{ layer }}
+{%- endfor %}
+{%- endif %}

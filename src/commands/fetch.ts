@@ -15,7 +15,7 @@ import { validateDeployOptions } from "../helpers/validateDeployOptions";
 import { FetchOptions } from "../types/app";
 
 async function createLambdaClient(options: Pick<FetchOptions, "profile" | "region">): Promise<LambdaClient> {
-  const creds = options.profile !== "default" ? await fromIni({ profile: options.profile }) : undefined;
+  const creds = await fromIni({ profile: options.profile });
 
   const lambdaClient = new LambdaClient({
     region: options.region,

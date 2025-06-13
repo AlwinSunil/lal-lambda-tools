@@ -63,9 +63,7 @@ async function updateExistingFunction(lambdaClient: LambdaClient, config: Lambda
 
     // Wait for code update to complete
     console.log(chalk.yellow("⏳ Waiting for code update to complete..."));
-    await waitForFunctionUpdate(lambdaClient, config.functionName);
-
-    // Update function configuration
+    await waitForFunctionUpdate(lambdaClient, config.functionName);    // Update function configuration
     console.log(chalk.yellow("⚙️  Updating function configuration..."));
     const updateConfigCommand = new UpdateFunctionConfigurationCommand({
       FunctionName: config.functionName,
@@ -73,6 +71,7 @@ async function updateExistingFunction(lambdaClient: LambdaClient, config: Lambda
       Handler: config.handler,
       Timeout: config.timeout,
       Role: config.roleArn,
+      Layers: config.layers,
     });
     const response = await lambdaClient.send(updateConfigCommand);
 
@@ -86,7 +85,6 @@ async function updateExistingFunction(lambdaClient: LambdaClient, config: Lambda
 
 async function createNewFunction(lambdaClient: LambdaClient, config: LambdaFunctionConfig): Promise<string> {
   console.log(chalk.yellow(`🆕 Creating new function: ${config.functionName}`));
-
   try {
     const createCommand = new CreateFunctionCommand({
       FunctionName: config.functionName,
@@ -98,6 +96,7 @@ async function createNewFunction(lambdaClient: LambdaClient, config: LambdaFunct
       },
       Timeout: config.timeout,
       Description: "Lambda function deployed by lal-lambda-tools",
+      Layers: config.layers,
     });
 
     const response = await lambdaClient.send(createCommand);

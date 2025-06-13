@@ -5,6 +5,7 @@ export type SupportedLanguage = "python" | "nodejs";
 export interface CreateOptions {
   language: SupportedLanguage;
   output: string;
+  layers?: string[];
 }
 
 export interface DeployOptions {
@@ -35,6 +36,7 @@ export interface SAMResource {
     Runtime?: Runtime;
     Timeout?: number;
     MemorySize?: number;
+    Layers?: string[];
   };
 }
 
@@ -46,6 +48,7 @@ export interface LambdaFunctionConfig {
   memorySize: number;
   roleArn: string;
   zipBuffer: Buffer;
+  layers?: string[];
 }
 
 export interface ParsedSAMTemplate {
@@ -55,4 +58,5 @@ export interface ParsedSAMTemplate {
   timeout: number;
   memorySize: number;
   codeUri: string;
+  layers?: string[];
 }
