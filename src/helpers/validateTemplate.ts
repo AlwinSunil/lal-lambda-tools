@@ -78,12 +78,4 @@ export function formatValidationErrors(errors: ValidationError[]): string {
   return `Template validation failed:\n${errorMessages.join("\n")}`;
 }
 
-export function isValidTemplate(template: unknown): template is z.infer<typeof SAMTemplateSchema> {
-  return SAMTemplateSchema.safeParse(template).success;
-}
-
-export function getValidationSchema() {
-  return SAMTemplateSchema;
-}
-
 export { SAMTemplateSchema };

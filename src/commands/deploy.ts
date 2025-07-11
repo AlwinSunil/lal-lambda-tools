@@ -2,6 +2,8 @@
 
 import { promises as fs } from "fs";
 import path from "path";
+import { exec, spawn } from "child_process";
+import { promisify } from "util";
 
 import chalk from "chalk";
 import fse from "fs-extra";
@@ -11,14 +13,12 @@ import YAML from "yaml";
 import { LambdaClient } from "@aws-sdk/client-lambda";
 import { fromIni } from "@aws-sdk/credential-providers";
 
-import { createDeploymentPackage } from "../helpers/createDeploymentPackage";
-import { deployFunction } from "../helpers/deployFunction";
 import { showStatusOnly } from "../helpers/showStatusOnly";
 import { validateDeployOptions } from "../helpers/validateDeployOptions";
-import { DeployOptions, LambdaFunctionConfig, ParsedSAMTemplate, SAMTemplate } from "../types/app";
+import { DeployOptions, ParsedSAMTemplate, SAMTemplate, SAMResource } from "../types/app";
 import { validateTemplate, formatValidationErrors } from "../helpers/validateTemplate";
 
-const DEFAULT_ROLE_ARN = "arn:aws:iam::358922846691:role/service-role/prescription-generator-role-c9fkws8j";
+const execPromise = promisify(exec);
 
 const parseTemplate = async (templatePath: string): Promise<ParsedSAMTemplate> => {
   const templateContent = await fs.readFile(templatePath, "utf-8");
@@ -32,14 +32,14 @@ const parseTemplate = async (templatePath: string): Promise<ParsedSAMTemplate> =
 
   const resources = template.Resources || {};
 
-  const lambdaResource = Object.entries(resources).find(([, resource]) => resource.Type === "AWS::Serverless::Function");
+  const lambdaResource = Object.entries(resources).find(([, resource]) => (resource as SAMResource).Type === "AWS::Serverless::Function");
 
   if (!lambdaResource) {
     throw new Error("No AWS::Serverless::Function resource found in template.yaml");
   }
 
   const [resourceName, resource] = lambdaResource;
-  const properties = resource.Properties!; // Safe to use ! after validation
+  const properties = (resource as SAMResource).Properties!; // Safe to use ! after validation
   return {
     functionName: resourceName,
     runtime: properties.Runtime!,
@@ -63,13 +63,33 @@ async function createLambdaClient(options: DeployOptions): Promise<LambdaClient>
   return lambdaClient;
 }
 
+/**
+ * Check if AWS SAM CLI is installed
+ */
+async function checkSamCliInstalled(): Promise<boolean> {
+  try {
+    const { stdout } = await execPromise("sam --version");
+    return stdout.toLowerCase().includes("sam cli");
+  } catch (error) {
+    return false;
+  }
+}
+
+/**
+ * Check if a samconfig.toml file exists in the current directory
+ */
+async function checkSamConfigExists(): Promise<boolean> {
+  const samConfigPath = path.join(process.cwd(), "samconfig.toml");
+  return fse.pathExists(samConfigPath);
+}
+
 async function deployLambda(options: DeployOptions) {
-  // Validate deploy options first
   const spinner = ora("Preparing deployment...\n").start();
 
-  spinner.text = "Validating deployment options...";
-  await validateDeployOptions(options);
   try {
+    spinner.text = "Validating deployment options...";
+    await validateDeployOptions(options);
+
     const templatePath = path.join(process.cwd(), "template.yml");
     if (!(await fse.pathExists(templatePath))) {
       throw new Error(
@@ -77,56 +97,120 @@ async function deployLambda(options: DeployOptions) {
       );
     }
 
-    spinner.text = "Parsing and validating template.yml...";
-
-    const templateConfig = await parseTemplate(templatePath);
-
-    const functionName = options.functionName || templateConfig.functionName;
-
-    spinner.text = "Setting up AWS clients...";
-
-    const lambdaClient = await createLambdaClient({
-      profile: options.profile,
-      region: options.region,
-    });
-
+    // Check if the status only flag is set
     if (options.statusOnly) {
+      spinner.text = "Setting up AWS clients for status check...";
+      const lambdaClient = await createLambdaClient({
+        profile: options.profile,
+        region: options.region,
+      });
+
+      const templateConfig = await parseTemplate(templatePath);
+      const functionName = options.functionName || templateConfig.functionName;
+
       showStatusOnly(spinner, lambdaClient, functionName);
       return;
     }
 
-    spinner.text = "Using execution role...";
-    const roleArn = options.role || DEFAULT_ROLE_ARN;
+    // Check if SAM CLI is installed
+    spinner.text = "Checking for AWS SAM CLI...";
+    const isSamCliInstalled = await checkSamCliInstalled();
+    if (!isSamCliInstalled) {
+      spinner.fail("AWS SAM CLI is not installed or not in PATH");
+      console.log(chalk.yellow("Please install AWS SAM CLI to continue:"));
+      console.log(
+        chalk.blue(
+          "https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html",
+        ),
+      );
+      return;
+    }
 
-    spinner.text = "Creating deployment package...";
-    const zipBuffer = await createDeploymentPackage(templateConfig.codeUri);
+    // Check if samconfig.toml exists
+    const samConfigExists = await checkSamConfigExists();
 
-    spinner.text = `Deploying Lambda function: ${functionName}...`;
-    const functionArn: string = await deployFunction(lambdaClient, <LambdaFunctionConfig>{
-      functionName: functionName,
-      runtime: templateConfig.runtime,
-      handler: templateConfig.handler,
-      timeout: templateConfig.timeout,
-      memorySize: templateConfig.memorySize,
-      roleArn: roleArn,
-      zipBuffer: zipBuffer,
-      layers: templateConfig.layers,
+    // Build the SAM deploy command
+    let deployCommand = "sam deploy";
+
+    // Add profile if specified
+    if (options.profile) {
+      deployCommand += ` --profile ${options.profile}`;
+    }
+
+    // If no samconfig.toml, add required parameters
+    if (!samConfigExists) {
+      spinner.info("No samconfig.toml found, will use command line parameters");
+      deployCommand += " --guided";
+    } else {
+      spinner.info("Using existing samconfig.toml for deployment configuration");
+      // With samconfig.toml, we can just use the non-interactive mode
+      deployCommand += " --no-confirm-changeset";
+    }
+
+    // Add region if specified and no samconfig.toml
+    if (options.region && !samConfigExists) {
+      deployCommand += ` --region ${options.region}`;
+    }
+
+    // Add stack name if specified and no samconfig.toml
+    if (options.functionName && !samConfigExists) {
+      deployCommand += ` --stack-name ${options.functionName}`;
+    }
+
+    // Parse template to get function information for output
+    spinner.text = "Parsing template.yml...";
+    const templateConfig = await parseTemplate(templatePath);
+    const functionName = options.functionName || templateConfig.functionName;
+
+    // Execute the SAM deploy command
+    spinner.text = `Deploying Lambda function using AWS SAM CLI: ${functionName}...`;
+    spinner.info(`Running: ${deployCommand}`);
+
+    // Temporarily stop the spinner to show real-time output
+    spinner.stop();
+    console.log(chalk.yellow("\n--- Deployment Process Started ---"));
+
+    // Use child_process.spawn to get real-time output
+    const samProcess = spawn(deployCommand, {
+      shell: true,
+      cwd: process.cwd(),
+      stdio: "inherit", // This will show output in real-time
     });
-    spinner.succeed(chalk.green("✅ Lambda function deployed successfully!"));
+
+    // Return a promise that resolves when the process exits
+    const processResult = await new Promise<{ success: boolean }>((resolve, reject) => {
+      samProcess.on("exit", (code: number | null) => {
+        if (code === 0) {
+          resolve({ success: true });
+        } else {
+          reject(new Error(`SAM CLI process exited with code ${code}`));
+        }
+      });
+
+      samProcess.on("error", (err: Error) => {
+        reject(new Error(`Failed to start SAM CLI process: ${err.message}`));
+      });
+    });
+
+    console.log(chalk.yellow("--- Deployment Process Completed ---\n"));
+
+    // Restart spinner for remaining steps
+    spinner.start();
+    spinner.succeed(chalk.green("✅ Lambda function deployed successfully with AWS SAM CLI!"));
+
     console.log(chalk.blue("🚀 Function Name: " + functionName));
-    console.log(chalk.blue("📍 Region: " + options.region));
-    console.log(chalk.blue("🔗 Function ARN: " + functionArn));
+    console.log(chalk.blue("📍 Region: " + (options.region || "from samconfig.toml")));
     console.log(chalk.blue("⚡ Runtime: " + templateConfig.runtime));
     console.log(chalk.blue("🎯 Handler: " + templateConfig.handler));
 
     if (templateConfig.layers && templateConfig.layers.length > 0) {
       console.log(chalk.blue("📦 Layers:"));
-      templateConfig.layers.forEach((layer, index) => {
+      templateConfig.layers.forEach((layer: string, index: number) => {
         console.log(chalk.blue(`   ${index + 1}. ${layer}`));
       });
     }
-  } catch (error) {
-    spinner.fail(`❌ Deployment failed: ${error}`);
+  } catch (error: any) {
+    spinner.fail(`❌ Deployment failed: ${error.message || error}`);
     throw error;
   }
 }

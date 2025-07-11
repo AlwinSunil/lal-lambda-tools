@@ -6,6 +6,7 @@ export interface CreateOptions {
   language: SupportedLanguage;
   output: string;
   layers?: string[];
+  stackName: string;
 }
 
 export interface DeployOptions {
@@ -38,17 +39,6 @@ export interface SAMResource {
     MemorySize?: number;
     Layers?: string[];
   };
-}
-
-export interface LambdaFunctionConfig {
-  functionName: string;
-  runtime: Runtime;
-  handler: string;
-  timeout: number;
-  memorySize: number;
-  roleArn: string;
-  zipBuffer: Buffer;
-  layers?: string[];
 }
 
 export interface ParsedSAMTemplate {

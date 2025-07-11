@@ -13,8 +13,9 @@
   "scripts": {
     "dev": "nodemon --exec npx tsx src/index.ts",
     "dev:watch": "nodemon --watch src --ext ts --exec tsx src/index.ts",
-    "build": "tsc && cp -r src/templates/*.liquid dist/templates/",
+    "build": "tsc && node -e \"require('fs-extra').ensureDirSync('dist/templates')\" && node -e \"require('fs-extra').copySync('src/templates', 'dist/templates')\"",
     "start": "node dist/index.js",
+    "prepare": "npm run build",
     "link": "npm link",
     "unlink": "npm unlink -g"
   },

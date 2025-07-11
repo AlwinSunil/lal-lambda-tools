@@ -27,17 +27,23 @@ const CreateTemplateSchema = z.object({
     .min(1, "Output directory is required")
     .refine((path) => !path.includes(".."), "Output path cannot contain '..' for security reasons"),
   layers: z.array(z.string()).optional(),
+  stackName: z.string().min(1, "Stack name is required"),
 });
 
-type CreateTemplateInput = z.infer<typeof CreateTemplateSchema>;
-
-async function createTemplate(name: string, language: SupportedLanguage, output: string, layers?: string[]): Promise<void> {
+async function createTemplate(
+  name: string,
+  language: SupportedLanguage,
+  output: string,
+  stackName: string,
+  layers?: string[],
+): Promise<void> {
   // Validate inputs using Zod schema
   const validationResult = CreateTemplateSchema.safeParse({
     name: name?.trim(),
     language,
     output,
     layers,
+    stackName,
   });
 
   if (!validationResult.success) {
@@ -50,6 +56,7 @@ async function createTemplate(name: string, language: SupportedLanguage, output:
     language: validatedLanguage,
     output: validatedOutput,
     layers: validatedLayers,
+    stackName: validatedStackName,
   } = validationResult.data;
   const projectDir = path.resolve(validatedOutput, validatedName);
 
@@ -125,6 +132,14 @@ async function createTemplate(name: string, language: SupportedLanguage, output:
         language: validatedLanguage,
       });
       await fs.writeFile(path.join(projectDir, "README.md"), readmeContent);
+
+      const samconfigContent = await engine.renderFile("samconfig.toml.liquid", {
+        stackName: validatedStackName || validatedName,
+        s3Prefix: validatedName,
+        region: "us-east-2",
+        profile: "lal-devops",
+      });
+      await fs.writeFile(path.join(projectDir, "samconfig.toml"), samconfigContent);
     } catch (fileError) {
       try {
         await fse.remove(projectDir);
@@ -145,6 +160,7 @@ async function createTemplate(name: string, language: SupportedLanguage, output:
       console.log("   ├── package.json");
     }
     console.log("   ├── template.yaml");
+    console.log("   ├── samconfig.toml");
     console.log("   ├── .gitignore");
     console.log("   └── README.md");
 
