@@ -15,6 +15,7 @@
     "dev:watch": "nodemon --watch src --ext ts --exec tsx src/index.ts",
     "build": "tsc && node -e \"require('fs-extra').ensureDirSync('dist/templates')\" && node -e \"require('fs-extra').copySync('src/templates', 'dist/templates')\" && node -e \"require('fs-extra').copySync('package.json', 'dist/package.json')\"",
     "start": "node dist/index.js",
+    "test": "echo \"No tests specified\" && exit 0",
     "prepare": "npm run build",
     "link": "npm link",
     "unlink": "npm unlink -g",
