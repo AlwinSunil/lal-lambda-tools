@@ -27,14 +27,14 @@ const CreateTemplateSchema = z.object({
     .min(1, "Output directory is required")
     .refine((path) => !path.includes(".."), "Output path cannot contain '..' for security reasons"),
   layers: z.array(z.string()).optional(),
-  stackName: z.string().min(1, "Stack name is required"),
+  stackName: z.string().optional(),
 });
 
 async function createTemplate(
   name: string,
   language: SupportedLanguage,
   output: string,
-  stackName: string,
+  stackName?: string,
   layers?: string[],
 ): Promise<void> {
   // Validate inputs using Zod schema
@@ -159,7 +159,7 @@ async function createTemplate(
     if (validatedLanguage === "nodejs") {
       console.log("   ├── package.json");
     }
-    console.log("   ├── template.yaml");
+    console.log("   ├── template.yml");
     console.log("   ├── samconfig.toml");
     console.log("   ├── .gitignore");
     console.log("   └── README.md");

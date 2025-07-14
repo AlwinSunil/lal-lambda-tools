@@ -2,18 +2,24 @@
 
 import chalk from "chalk";
 import { Command } from "commander";
+import { readFileSync } from "fs";
+import { join } from "path";
 
 import { createTemplate } from "./commands/create-template";
 import { deployLambda } from "./commands/deploy";
 import { fetchLambda } from "./commands/fetch";
 import { CreateOptions, DeployOptions, FetchOptions } from "./types/app";
 
+// Read version from package.json
+const packageJson = JSON.parse(readFileSync(join(__dirname, "../package.json"), "utf8"));
+const version = packageJson.version;
+
 const program = new Command();
 
 program
   .name("lal-lambda-tools")
   .description("CLI for AWS Lambda development (LiveAltLife)")
-  .version("0.1.0")
+  .version(version)
   .addHelpText(
     "after",
     `
@@ -44,10 +50,10 @@ program
     "after",
     `
 ${chalk.cyan("Examples:")}
-  ${chalk.green("lal-lambda-tools create UserAuth")}                 Create Python function
-  ${chalk.green("lal-lambda-tools create ApiGateway -l nodejs")}     Create Node.js function
-  ${chalk.green("lal-lambda-tools create Processor -o ./functions")} Create in specific directory
-  ${chalk.green("lal-lambda-tools create MyLambda --stack-name my-stack")} Create with custom stack name
+  ${chalk.green("lal-lambda-tools create UserAuth")}                   Create Python function
+  ${chalk.green("lal-lambda-tools create ApiGateway -l nodejs")}       Create Node.js function
+  ${chalk.green("lal-lambda-tools create Processor -o ./functions")}   Create in specific directory
+  ${chalk.green("lal-lambda-tools create MyLambda --stack-name my-stack")}  Create with custom stack name
 
 ${chalk.cyan("Runtime Info:")}
   ${chalk.white("python")}    Python 3.9+ (default)
@@ -81,9 +87,9 @@ program
     "after",
     `
 ${chalk.cyan("Examples:")}
-  ${chalk.green("lal-lambda-tools deploy")}                Deploy with default settings
-  ${chalk.green("lal-lambda-tools deploy -p dev")}         Use specific AWS profile
-  ${chalk.green("lal-lambda-tools deploy -r eu-west-1")}   Deploy to specific region
+  ${chalk.green("lal-lambda-tools deploy")}                  Deploy with default settings
+  ${chalk.green("lal-lambda-tools deploy -p dev")}           Use specific AWS profile
+  ${chalk.green("lal-lambda-tools deploy -r eu-west-1")}     Deploy to specific region
 
 ${chalk.cyan("Requirements:")}
   • template.yml in current directory
@@ -117,9 +123,9 @@ program
     "after",
     `
 ${chalk.cyan("Examples:")}
-  ${chalk.green("lal-lambda-tools fetch UserAuth")}               Download function
-  ${chalk.green("lal-lambda-tools fetch ApiGateway -p prod")}     Use specific profile
-  ${chalk.green("lal-lambda-tools fetch Processor -o ./backup")}  Download to specific directory
+  ${chalk.green("lal-lambda-tools fetch UserAuth")}                 Download function
+  ${chalk.green("lal-lambda-tools fetch ApiGateway -p prod")}       Use specific profile
+  ${chalk.green("lal-lambda-tools fetch Processor -o ./backup")}    Download to specific directory
 
 ${chalk.cyan("Process:")}
   1. Connects to AWS Lambda service

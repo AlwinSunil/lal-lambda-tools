@@ -6,7 +6,7 @@ export interface CreateOptions {
   language: SupportedLanguage;
   output: string;
   layers?: string[];
-  stackName: string;
+  stackName?: string;
 }
 
 export interface DeployOptions {

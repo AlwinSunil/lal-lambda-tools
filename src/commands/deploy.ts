@@ -32,7 +32,9 @@ const parseTemplate = async (templatePath: string): Promise<ParsedSAMTemplate> =
 
   const resources = template.Resources || {};
 
-  const lambdaResource = Object.entries(resources).find(([, resource]) => (resource as SAMResource).Type === "AWS::Serverless::Function");
+  const lambdaResource = Object.entries(resources).find(
+    ([, resource]) => (resource as SAMResource).Type === "AWS::Serverless::Function",
+  );
 
   if (!lambdaResource) {
     throw new Error("No AWS::Serverless::Function resource found in template.yaml");
