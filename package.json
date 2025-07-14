@@ -1,6 +1,6 @@
 {
   "name": "lal-lambda-tools",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "LiveAltLife Lambda tools for template creation and deployment",
   "main": "dist/index.js",
   "bin": {
