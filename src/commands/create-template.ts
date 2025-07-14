@@ -27,14 +27,14 @@ const CreateTemplateSchema = z.object({
     .min(1, "Output directory is required")
     .refine((path) => !path.includes(".."), "Output path cannot contain '..' for security reasons"),
   layers: z.array(z.string()).optional(),
-  stackName: z.string().optional(),
+  stackName: z.string().min(1, "Stack name is required"),
 });
 
 async function createTemplate(
   name: string,
   language: SupportedLanguage,
   output: string,
-  stackName?: string,
+  stackName: string,
   layers?: string[],
 ): Promise<void> {
   // Validate inputs using Zod schema
@@ -134,7 +134,7 @@ async function createTemplate(
       await fs.writeFile(path.join(projectDir, "README.md"), readmeContent);
 
       const samconfigContent = await engine.renderFile("samconfig.toml.liquid", {
-        stackName: validatedStackName || validatedName,
+        stackName: validatedStackName,
         s3Prefix: validatedName,
         region: "us-east-2",
         profile: "lal-devops",
