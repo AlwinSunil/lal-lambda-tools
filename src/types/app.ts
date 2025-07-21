@@ -7,7 +7,7 @@ export interface CreateOptions {
   output: string;
   layers?: string[];
   stackName: string;
-  role?: string;
+  role: string;
 }
 
 export interface DeployOptions {

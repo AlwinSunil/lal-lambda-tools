@@ -46,28 +46,31 @@ program
   .option("--language <type>", "Language (default: python)", "python")
   .option("--output <directory>", "Output directory (default: current directory)", ".")
   .option("--layers <arns...>", "Layer ARNs to attach to the function")
-  .option("--stack-name <name>", "CloudFormation stack name (required - use existing or create new)")
-  .option(
+  .requiredOption("--stack-name <name>", "CloudFormation stack name (required - use existing or create new)")
+  .requiredOption(
     "--role <arn>",
-    "IAM execution role ARN (default: arn:aws:iam::358922846691:role/service-role/prescription-generator-role-c9fkws8j)",
+    "IAM execution role ARN (required)",
   )
   .addHelpText(
     "after",
     `
 ${chalk.cyan("Examples:")}
-  ${chalk.green("lal-lambda-tools create UserAuth --stack-name my-auth-stack")}     Create Python function
-  ${chalk.green("lal-lambda-tools create ApiGateway --language nodejs --stack-name api-stack")}  Create Node.js function
-  ${chalk.green("lal-lambda-tools create Processor --output ./functions --stack-name proc-stack")}  Create in specific directory
+  ${chalk.green("lal-lambda-tools create UserAuth --stack-name my-auth-stack --role arn:aws:iam::123456789012:role/lambda-execution-role")}
+  ${chalk.green("lal-lambda-tools create ApiGateway --language nodejs --stack-name api-stack --role arn:aws:iam::123456789012:role/lambda-role")}
+  ${chalk.green("lal-lambda-tools create Processor --output ./functions --stack-name proc-stack --role arn:aws:iam::123456789012:role/my-lambda-role")}
 
 ${chalk.cyan("Runtime Info:")}
   ${chalk.white("python")}    Python 3.9+ (default)
   ${chalk.white("nodejs")}    Node.js 18+
 
-${chalk.cyan("Stack Name:")}
-  • ${chalk.yellow("Required")} - Must specify a CloudFormation stack name
-  • Use existing stack name to update existing deployment
-  • Use new stack name to create a new deployment
-  • Stack name must be unique within your AWS account/region
+${chalk.cyan("Required Parameters:")}
+  • ${chalk.yellow("--stack-name")} - CloudFormation stack name (use existing or create new)
+  • ${chalk.yellow("--role")} - IAM execution role ARN for the Lambda function
+
+${chalk.cyan("IAM Role Requirements:")}
+  • Must be a valid IAM role ARN
+  • Role must have Lambda execution permissions
+  • Example: arn:aws:iam::123456789012:role/lambda-execution-role
 
 ${chalk.cyan("Template Features:")}
   • SAM template with best practices 
@@ -77,16 +80,7 @@ ${chalk.cyan("Template Features:")}
   )
   .action(async (name, options: CreateOptions) => {
     try {
-      // Check if stack name is provided
-      if (!options.stackName) {
-        console.error(
-          chalk.red(`❌ Error: Stack name is required. Use --stack-name <name> to specify a CloudFormation stack name.`),
-        );
-        console.error(chalk.yellow(`💡 Example: lal-lambda-tools create ${name} --stack-name my-${name.toLowerCase()}-stack`));
-        process.exit(1);
-      }
-
-      await createTemplate(name, options.language, options.output, options.stackName, options.layers, options.role);
+      await createTemplate(name, options.language, options.output, options.stackName, options.role, options.layers);
     } catch (error) {
       console.error(chalk.red(`❌ Error creating template: ${error}`));
       process.exit(1);

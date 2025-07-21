@@ -28,7 +28,7 @@ const CreateTemplateSchema = z.object({
     .refine((path) => !path.includes(".."), "Output path cannot contain '..' for security reasons"),
   layers: z.array(z.string()).optional(),
   stackName: z.string().min(1, "Stack name is required"),
-  role: z.string().optional(),
+  role: z.string().min(1, "IAM role ARN is required"),
 });
 
 async function createTemplate(
@@ -36,8 +36,8 @@ async function createTemplate(
   language: SupportedLanguage,
   output: string,
   stackName: string,
+  role: string,
   layers?: string[],
-  role?: string,
 ): Promise<void> {
   // Validate inputs using Zod schema
   const validationResult = CreateTemplateSchema.safeParse({
