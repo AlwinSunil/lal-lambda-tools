@@ -42,17 +42,21 @@ program
   .command("create")
   .description("Create new Lambda function from template")
   .argument("<name>", "Function name (PascalCase)")
-  .option("-l, --language <type>", "Language (default: python)", "python")
-  .option("-o, --output <directory>", "Output directory (default: current directory)", ".")
+  .option("--language <type>", "Language (default: python)", "python")
+  .option("--output <directory>", "Output directory (default: current directory)", ".")
   .option("--layers <arns...>", "Layer ARNs to attach to the function")
   .option("--stack-name <name>", "CloudFormation stack name (required - use existing or create new)")
+  .option(
+    "--role <arn>",
+    "IAM execution role ARN (default: arn:aws:iam::358922846691:role/service-role/prescription-generator-role-c9fkws8j)",
+  )
   .addHelpText(
     "after",
     `
 ${chalk.cyan("Examples:")}
   ${chalk.green("lal-lambda-tools create UserAuth --stack-name my-auth-stack")}     Create Python function
-  ${chalk.green("lal-lambda-tools create ApiGateway -l nodejs --stack-name api-stack")}  Create Node.js function
-  ${chalk.green("lal-lambda-tools create Processor -o ./functions --stack-name proc-stack")}  Create in specific directory
+  ${chalk.green("lal-lambda-tools create ApiGateway --language nodejs --stack-name api-stack")}  Create Node.js function
+  ${chalk.green("lal-lambda-tools create Processor --output ./functions --stack-name proc-stack")}  Create in specific directory
 
 ${chalk.cyan("Runtime Info:")}
   ${chalk.white("python")}    Python 3.9+ (default)
@@ -74,7 +78,9 @@ ${chalk.cyan("Template Features:")}
     try {
       // Check if stack name is provided
       if (!options.stackName) {
-        console.error(chalk.red(`❌ Error: Stack name is required. Use --stack-name <name> to specify a CloudFormation stack name.`));
+        console.error(
+          chalk.red(`❌ Error: Stack name is required. Use --stack-name <name> to specify a CloudFormation stack name.`),
+        );
         console.error(chalk.yellow(`💡 Example: lal-lambda-tools create ${name} --stack-name my-${name.toLowerCase()}-stack`));
         process.exit(1);
       }
@@ -90,18 +96,18 @@ ${chalk.cyan("Template Features:")}
 program
   .command("deploy")
   .description("Deploy Lambda function to AWS")
-  .option("-p, --profile <name>", "AWS CLI profile", "default")
-  .option("-r, --region <region>", "AWS region", "us-east-2")
-  .option("-f, --function-name <name>", "Override function name")
+  .option("--profile <name>", "AWS CLI profile", "default")
+  .option("--region <region>", "AWS region", "us-east-2")
+  .option("--function-name <name>", "Override function name")
   .option("--role <arn>", "IAM execution role ARN")
-  .option("-s, --status-only", "Check deployment status only")
+  .option("--status-only", "Check deployment status only")
   .addHelpText(
     "after",
     `
 ${chalk.cyan("Examples:")}
   ${chalk.green("lal-lambda-tools deploy")}                  Deploy with default settings
-  ${chalk.green("lal-lambda-tools deploy -p dev")}           Use specific AWS profile
-  ${chalk.green("lal-lambda-tools deploy -r eu-west-1")}     Deploy to specific region
+  ${chalk.green("lal-lambda-tools deploy --profile dev")}           Use specific AWS profile
+  ${chalk.green("lal-lambda-tools deploy --region eu-west-1")}     Deploy to specific region
 
 ${chalk.cyan("Requirements:")}
   • template.yml in current directory
@@ -128,16 +134,16 @@ program
   .command("fetch")
   .description("Download Lambda function from AWS")
   .argument("<name>", "Function name")
-  .option("-p, --profile <name>", "AWS CLI profile", "default")
-  .option("-r, --region <region>", "AWS region", "us-east-2")
-  .option("-o, --output <directory>", "Output directory", ".")
+  .option("--profile <name>", "AWS CLI profile", "default")
+  .option("--region <region>", "AWS region", "us-east-2")
+  .option("--output <directory>", "Output directory", ".")
   .addHelpText(
     "after",
     `
 ${chalk.cyan("Examples:")}
   ${chalk.green("lal-lambda-tools fetch UserAuth")}                 Download function
-  ${chalk.green("lal-lambda-tools fetch ApiGateway -p prod")}       Use specific profile
-  ${chalk.green("lal-lambda-tools fetch Processor -o ./backup")}    Download to specific directory
+  ${chalk.green("lal-lambda-tools fetch ApiGateway --profile prod")}       Use specific profile
+  ${chalk.green("lal-lambda-tools fetch Processor --output ./backup")}    Download to specific directory
 
 ${chalk.cyan("Process:")}
   1. Connects to AWS Lambda service

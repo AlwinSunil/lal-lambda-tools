@@ -28,6 +28,7 @@ const CreateTemplateSchema = z.object({
     .refine((path) => !path.includes(".."), "Output path cannot contain '..' for security reasons"),
   layers: z.array(z.string()).optional(),
   stackName: z.string().min(1, "Stack name is required"),
+  role: z.string().optional(),
 });
 
 async function createTemplate(
@@ -36,6 +37,7 @@ async function createTemplate(
   output: string,
   stackName: string,
   layers?: string[],
+  role?: string,
 ): Promise<void> {
   // Validate inputs using Zod schema
   const validationResult = CreateTemplateSchema.safeParse({
@@ -44,6 +46,7 @@ async function createTemplate(
     output,
     layers,
     stackName,
+    role,
   });
 
   if (!validationResult.success) {
@@ -57,6 +60,7 @@ async function createTemplate(
     output: validatedOutput,
     layers: validatedLayers,
     stackName: validatedStackName,
+    role: validatedRole,
   } = validationResult.data;
   const projectDir = path.resolve(validatedOutput, validatedName);
 
@@ -121,6 +125,7 @@ async function createTemplate(
         resourceName,
         language: validatedLanguage,
         layers: validatedLayers,
+        role: validatedRole,
       });
       await fs.writeFile(path.join(projectDir, "template.yml"), templateContent);
 
