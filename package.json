@@ -25,6 +25,9 @@
   },
   "author": "LiveAltLife",
   "license": "UNLICENSED",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
     "@aws-sdk/client-lambda": "^3.825.0",
     "@aws-sdk/client-sts": "^3.826.0",

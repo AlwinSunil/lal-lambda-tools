@@ -8,6 +8,8 @@ export interface CreateOptions {
   layers?: string[];
   stackName: string;
   role: string;
+  profile: string;
+  region: string;
 }
 
 export interface DeployOptions {

@@ -1,60 +1,66 @@
 # LAL Lambda Tools
 
-A CLI tool for streamlined AWS Lambda development and deployment.
-
-## Features
-
-- ⚡ Rapid project creation with best-practice templates
-- 🚀 Simplified deployment using AWS SAM CLI
-- 🔄 Fetch existing Lambda functions for local development
-- 🛠️ Multi-language support (Python, Node.js)
+CLI tool for AWS Lambda development and deployment with template generation.
 
 ## Installation
 
 ```bash
-# Install globally
 npm install -g lal-lambda-tools
-
-# Or use with npx (recommended)
-npx lal-lambda-tools --help
 ```
 
-## Usage
+## Commands
 
-### Creating a Lambda Function Template
+### Create Template
+Generate a Lambda function template with SAM configuration:
 
 ```bash
-lal-lambda-tools create UserAuth
+lal-lambda-tools create MyFunction --stack-name my-stack --role arn:aws:iam::123456789012:role/lambda-role
 ```
 
-Options:
-- `-l, --language <type>` - Language (python/nodejs)
-- `-o, --output <dir>` - Output directory
-- `--stack-name <name>` - Custom CloudFormation stack name
-- `--layers <arns...>` - Layer ARNs to attach
+**Required Options:**
 
-### Deploying a Lambda Function
+- `--stack-name` - CloudFormation stack name, can pass exisiting stack or pass a new name to create a new stack
+- `--role` - IAM execution role ARN
+
+**Optional:**
+- `--language` - `python` (default) or `nodejs`
+- `--output` - Output directory (default: current)
+- `--profile` - AWS CLI profile (default: `default`)
+- `--region` - AWS region (default: `us-east-2`)
+- `--layers` - Layer ARNs to attach
+
+### Deploy
+
+Deploy Lambda function using AWS SAM:
 
 ```bash
 lal-lambda-tools deploy
 ```
 
-Options:
-- `-p, --profile <name>` - AWS CLI profile
-- `-r, --region <region>` - AWS region
-- `-f, --function-name <name>` - Override function name
-- `-s, --status-only` - Check deployment status only
+**Options:**
 
-### Fetching an Existing Lambda Function
+- `--profile` - AWS CLI profile (default: `default`)
+- `--region` - AWS region (default: `us-east-2`)
+- `--function-name` - Pass only if required to override function name from template.yml
+- `--status-only` - Check deployment status only
+
+**Requirements:** `template.yml` and AWS SAM CLI installed
+
+### Fetch
+
+Download existing Lambda function from AWS:
 
 ```bash
-lal-lambda-tools fetch UserAuth
+lal-lambda-tools fetch FunctionName
 ```
 
-Options:
-- `-p, --profile <name>` - AWS CLI profile
-- `-r, --region <region>` - AWS region
-- `-o, --output <dir>` - Output directory
+**Options:**
+
+- `--profile` - AWS CLI profile (default: `default`)
+- `--region` - AWS region (default: `us-east-2`)
+- `--output` - Output directory (default: current)
+
+Downloads function code and configuration for local development.
 
 ## Requirements
 

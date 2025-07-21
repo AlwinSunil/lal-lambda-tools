@@ -29,10 +29,16 @@ ${chalk.cyan("Commands:")}
   ${chalk.white("deploy")}           Deploy Lambda function with SAM
   ${chalk.white("fetch <name>")}     Download Lambda function from AWS
 
+${chalk.cyan("Global Options:")}
+  ${chalk.white("--profile")}        AWS CLI profile (default: default)
+  ${chalk.white("--region")}         AWS region (default: us-east-2)
+
 ${chalk.cyan("Quick Examples:")}
-  ${chalk.dim("$")} ${chalk.green("lal-lambda-tools create UserAuth")}
+  ${chalk.dim("$")} ${chalk.green(
+      "lal-lambda-tools create UserAuth --stack-name my-stack --role arn:aws:iam::123456789012:role/lambda-role",
+    )}
   ${chalk.dim("$")} ${chalk.green("lal-lambda-tools deploy --profile dev")}
-  ${chalk.dim("$")} ${chalk.green("lal-lambda-tools fetch UserAuth")}
+  ${chalk.dim("$")} ${chalk.green("lal-lambda-tools fetch UserAuth --region us-west-2 --profile lal-devops")}
 
 ${chalk.dim("Run 'lal-lambda-tools <command> --help' for specific options")}
 `,
@@ -43,21 +49,26 @@ program
   .command("create")
   .description("Create new Lambda function from template")
   .argument("<name>", "Function name (PascalCase)")
+  .requiredOption("--stack-name <name>", "CloudFormation stack name (required - use existing or create new)")
+  .requiredOption("--role <arn>", "IAM execution role ARN (required)")
   .option("--language <type>", "Language (default: python)", "python")
   .option("--output <directory>", "Output directory (default: current directory)", ".")
+  .option("--profile <name>", "AWS CLI profile", "default")
+  .option("--region <region>", "AWS region", "us-east-2")
   .option("--layers <arns...>", "Layer ARNs to attach to the function")
-  .requiredOption("--stack-name <name>", "CloudFormation stack name (required - use existing or create new)")
-  .requiredOption(
-    "--role <arn>",
-    "IAM execution role ARN (required)",
-  )
   .addHelpText(
     "after",
     `
 ${chalk.cyan("Examples:")}
-  ${chalk.green("lal-lambda-tools create UserAuth --stack-name my-auth-stack --role arn:aws:iam::123456789012:role/lambda-execution-role")}
-  ${chalk.green("lal-lambda-tools create ApiGateway --language nodejs --stack-name api-stack --role arn:aws:iam::123456789012:role/lambda-role")}
-  ${chalk.green("lal-lambda-tools create Processor --output ./functions --stack-name proc-stack --role arn:aws:iam::123456789012:role/my-lambda-role")}
+  ${chalk.green(
+    "lal-lambda-tools create UserAuth --stack-name my-auth-stack --role arn:aws:iam::123456789012:role/lambda-execution-role",
+  )}
+  ${chalk.green(
+    "lal-lambda-tools create ApiGateway --language nodejs --stack-name api-stack --role arn:aws:iam::123456789012:role/lambda-role",
+  )}
+  ${chalk.green(
+    "lal-lambda-tools create Processor --output ./functions --profile prod --region us-west-2 --stack-name proc-stack --role arn:aws:iam::123456789012:role/my-lambda-role",
+  )}
 
 ${chalk.cyan("Runtime Info:")}
   ${chalk.white("python")}    Python 3.9+ (default)
@@ -67,6 +78,10 @@ ${chalk.cyan("Required Parameters:")}
   • ${chalk.yellow("--stack-name")} - CloudFormation stack name (use existing or create new)
   • ${chalk.yellow("--role")} - IAM execution role ARN for the Lambda function
 
+${chalk.cyan("Optional Parameters:")}
+  • ${chalk.yellow("--profile")} - AWS CLI profile (default: default)
+  • ${chalk.yellow("--region")} - AWS region (default: us-east-2)
+
 ${chalk.cyan("IAM Role Requirements:")}
   • Must be a valid IAM role ARN
   • Role must have Lambda execution permissions
@@ -75,12 +90,21 @@ ${chalk.cyan("IAM Role Requirements:")}
 ${chalk.cyan("Template Features:")}
   • SAM template with best practices 
   • Function code with error handling
-  • Ready-to-deploy samconfig.toml
+  • Ready-to-deploy samconfig.toml with your profile/region
 `,
   )
   .action(async (name, options: CreateOptions) => {
     try {
-      await createTemplate(name, options.language, options.output, options.stackName, options.role, options.layers);
+      await createTemplate(
+        name,
+        options.language,
+        options.output,
+        options.stackName,
+        options.role,
+        options.layers,
+        options.profile,
+        options.region,
+      );
     } catch (error) {
       console.error(chalk.red(`❌ Error creating template: ${error}`));
       process.exit(1);
@@ -102,7 +126,7 @@ program
 ${chalk.cyan("Examples:")}
   ${chalk.green("lal-lambda-tools deploy")}                  Deploy with default settings
   ${chalk.green("lal-lambda-tools deploy --profile dev")}           Use specific AWS profile
-  ${chalk.green("lal-lambda-tools deploy --region eu-west-1")}     Deploy to specific region
+  ${chalk.green("lal-lambda-tools deploy --region us-east-1")}     Deploy to specific region
 
 ${chalk.cyan("Requirements:")}
   • template.yml in current directory

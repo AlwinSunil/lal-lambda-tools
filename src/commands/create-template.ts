@@ -29,6 +29,8 @@ const CreateTemplateSchema = z.object({
   layers: z.array(z.string()).optional(),
   stackName: z.string().min(1, "Stack name is required"),
   role: z.string().min(1, "IAM role ARN is required"),
+  profile: z.string().min(1, "Profile is required"),
+  region: z.string().min(1, "Region is required"),
 });
 
 async function createTemplate(
@@ -38,6 +40,8 @@ async function createTemplate(
   stackName: string,
   role: string,
   layers?: string[],
+  profile?: string,
+  region?: string,
 ): Promise<void> {
   // Validate inputs using Zod schema
   const validationResult = CreateTemplateSchema.safeParse({
@@ -47,6 +51,8 @@ async function createTemplate(
     layers,
     stackName,
     role,
+    profile: profile || "default",
+    region: region || "us-east-2",
   });
 
   if (!validationResult.success) {
@@ -61,7 +67,10 @@ async function createTemplate(
     layers: validatedLayers,
     stackName: validatedStackName,
     role: validatedRole,
+    profile: validatedProfile,
+    region: validatedRegion,
   } = validationResult.data;
+
   const projectDir = path.resolve(validatedOutput, validatedName);
 
   // Check if directory already exists
@@ -141,8 +150,8 @@ async function createTemplate(
       const samconfigContent = await engine.renderFile("samconfig.toml.liquid", {
         stackName: validatedStackName,
         s3Prefix: validatedName,
-        region: "us-east-2",
-        profile: "lal-devops",
+        region: validatedRegion,
+        profile: validatedProfile,
       });
       await fs.writeFile(path.join(projectDir, "samconfig.toml"), samconfigContent);
     } catch (fileError) {
