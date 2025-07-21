@@ -17,8 +17,11 @@ export const showStatusOnly = async (spinner: Ora, lambdaClient: LambdaClient, f
     console.log(chalk.blue(`📊 State: ${functionConfig.State || "Unknown"}`));
     console.log(chalk.blue(`🔄 Last Update Status: ${functionConfig.LastUpdateStatus || "Unknown"}`));
     console.log(chalk.blue(`📅 Last Modified: ${functionConfig.LastModified || "Unknown"}`));
-    console.log(chalk.blue(`⚡ Runtime: ${functionConfig.Runtime || "Unknown"}`));    console.log(chalk.blue(`🎯 Handler: ${functionConfig.Handler || "Unknown"}`));
+    console.log(chalk.blue(`🔐 Role: ${functionConfig.Role || "Unknown"}`));
+    console.log(chalk.blue(`🎯 Handler: ${functionConfig.Handler || "Unknown"}`));
+    console.log(chalk.blue(`⚡ Runtime: ${functionConfig.Runtime || "Unknown"}`));
     console.log(chalk.blue(`⏱️ Timeout: ${functionConfig.Timeout || "Unknown"}s`));
+    console.log(chalk.blue(`💾 Memory: ${functionConfig.MemorySize || "Unknown"}MB`));
     console.log(chalk.blue(`🔗 Function ARN: ${functionConfig.FunctionArn || "Unknown"}`));
 
     if (functionConfig.Layers && functionConfig.Layers.length > 0) {

@@ -7,6 +7,7 @@ export interface CreateOptions {
   output: string;
   layers?: string[];
   stackName: string;
+  role?: string;
 }
 
 export interface DeployOptions {
@@ -32,6 +33,8 @@ export interface SAMTemplate {
 export interface SAMResource {
   Type: string;
   Properties?: {
+    FunctionName?: string;
+    Role?: string;
     CodeUri?: string;
     Handler?: string;
     Runtime?: Runtime;
@@ -43,10 +46,11 @@ export interface SAMResource {
 
 export interface ParsedSAMTemplate {
   functionName: string;
-  runtime: Runtime;
+  role?: string;
+  codeUri: string;
   handler: string;
+  runtime: Runtime;
   timeout: number;
   memorySize: number;
-  codeUri: string;
   layers?: string[];
 }

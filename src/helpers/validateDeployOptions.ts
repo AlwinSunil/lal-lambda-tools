@@ -1,7 +1,7 @@
 import { z } from "zod";
 
+import { GetCallerIdentityCommand, STSClient } from "@aws-sdk/client-sts";
 import { fromIni } from "@aws-sdk/credential-providers";
-import { STSClient, GetCallerIdentityCommand } from "@aws-sdk/client-sts";
 
 import { DeployOptions } from "../types/app";
 
@@ -55,19 +55,20 @@ export async function validateDeployOptions(options: DeployOptions): Promise<voi
     if (!identity.Account || !identity.Arn) {
       throw new Error(`Unable to verify AWS identity for profile '${options.profile}'`);
     }
-  } catch (error: any) {
-    if (error.name === "ProfileNotFoundError" || error.name === "CredentialsProviderError") {
+  } catch (error: unknown) {
+    const err = error as Error;
+    if (err.name === "ProfileNotFoundError" || err.name === "CredentialsProviderError") {
       throw new Error(`AWS profile '${options.profile}' not found or invalid credentials`);
     }
-    if (error.name === "UnrecognizedClientException" || error.name === "InvalidClientTokenId") {
+    if (err.name === "UnrecognizedClientException" || err.name === "InvalidClientTokenId") {
       throw new Error(`Invalid AWS credentials for profile '${options.profile}'`);
     }
-    if (error.name === "AccessDenied" || error.name === "UnauthorizedOperation") {
+    if (err.name === "AccessDenied" || err.name === "UnauthorizedOperation") {
       throw new Error(`AWS credentials for profile '${options.profile}' lack necessary permissions`);
     }
-    if (error.name === "TokenRefreshRequired" || error.name === "ExpiredToken") {
+    if (err.name === "TokenRefreshRequired" || err.name === "ExpiredToken") {
       throw new Error(`AWS credentials for profile '${options.profile}' have expired. Please refresh your credentials`);
     }
-    throw new Error(`AWS validation failed: ${error.message}`);
+    throw new Error(`AWS validation failed: ${err.message}`);
   }
 }

@@ -2,12 +2,12 @@
 
 import path from "path";
 
+import AdmZip from "adm-zip";
 import chalk from "chalk";
 import fse from "fs-extra";
 import ora from "ora";
-import AdmZip from "adm-zip";
 
-import { LambdaClient, GetFunctionCommand } from "@aws-sdk/client-lambda";
+import { GetFunctionCommand, LambdaClient } from "@aws-sdk/client-lambda";
 import { fromIni } from "@aws-sdk/credential-providers";
 
 import { checkFunctionStatus } from "../helpers/checkFunctionStatus";
@@ -106,8 +106,9 @@ ${chalk.blue("📁 Downloaded to:")}`);
 ${chalk.blue("📊 Function details (from AWS):")}`);
     console.log(`   🚀 Function Name: ${functionName}`);
     console.log(`   📍 Region: ${options.region}`);
-    console.log(`   ⚡ Runtime: ${functionConfig.Runtime || "Unknown"}`);
+    console.log(`   🔐 Role: ${functionConfig.Role || "Unknown"}`);
     console.log(`   🎯 Handler: ${functionConfig.Handler || "Unknown"}`);
+    console.log(`   ⚡ Runtime: ${functionConfig.Runtime || "Unknown"}`);
     console.log(`   ⏱️ Timeout: ${functionConfig.Timeout || "Unknown"}s`);
     console.log(`   💾 Memory: ${functionConfig.MemorySize || "Unknown"}MB`);
 

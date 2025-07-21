@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 
-import chalk from "chalk";
-import { Command } from "commander";
 import { readFileSync } from "fs";
 import { join } from "path";
+
+import chalk from "chalk";
+import { Command } from "commander";
 
 import { createTemplate } from "./commands/create-template";
 import { deployLambda } from "./commands/deploy";
@@ -85,7 +86,7 @@ ${chalk.cyan("Template Features:")}
         process.exit(1);
       }
 
-      await createTemplate(name, options.language, options.output, options.stackName, options.layers);
+      await createTemplate(name, options.language, options.output, options.stackName, options.layers, options.role);
     } catch (error) {
       console.error(chalk.red(`❌ Error creating template: ${error}`));
       process.exit(1);

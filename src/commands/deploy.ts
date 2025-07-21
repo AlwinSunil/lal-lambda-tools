@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
+import { exec, spawn } from "child_process";
 import { promises as fs } from "fs";
 import path from "path";
-import { exec, spawn } from "child_process";
 import { promisify } from "util";
 
 import chalk from "chalk";
@@ -15,8 +15,8 @@ import { fromIni } from "@aws-sdk/credential-providers";
 
 import { showStatusOnly } from "../helpers/showStatusOnly";
 import { validateDeployOptions } from "../helpers/validateDeployOptions";
-import { DeployOptions, ParsedSAMTemplate, SAMTemplate, SAMResource } from "../types/app";
-import { validateTemplate, formatValidationErrors } from "../helpers/validateTemplate";
+import { formatValidationErrors, validateTemplate } from "../helpers/validateTemplate";
+import { DeployOptions, ParsedSAMTemplate, SAMResource, SAMTemplate } from "../types/app";
 
 const execPromise = promisify(exec);
 
@@ -44,11 +44,12 @@ const parseTemplate = async (templatePath: string): Promise<ParsedSAMTemplate> =
   const properties = (resource as SAMResource).Properties!; // Safe to use ! after validation
   return {
     functionName: resourceName,
-    runtime: properties.Runtime!,
+    role: properties.Role,
+    codeUri: properties.CodeUri!,
     handler: properties.Handler!,
+    runtime: properties.Runtime!,
     timeout: properties.Timeout!,
     memorySize: properties.MemorySize!,
-    codeUri: properties.CodeUri!,
     layers: properties.Layers,
   };
 };
@@ -202,8 +203,14 @@ async function deployLambda(options: DeployOptions) {
 
     console.log(chalk.blue("🚀 Function Name: " + functionName));
     console.log(chalk.blue("📍 Region: " + (options.region || "from samconfig.toml")));
-    console.log(chalk.blue("⚡ Runtime: " + templateConfig.runtime));
+    if (templateConfig.role) {
+      console.log(chalk.blue("🔐 Role: " + templateConfig.role));
+    }
+    console.log(chalk.blue("📁 Code URI: " + templateConfig.codeUri));
     console.log(chalk.blue("🎯 Handler: " + templateConfig.handler));
+    console.log(chalk.blue("⚡ Runtime: " + templateConfig.runtime));
+    console.log(chalk.blue("⏱️ Timeout: " + templateConfig.timeout + "s"));
+    console.log(chalk.blue("💾 Memory: " + templateConfig.memorySize + "MB"));
 
     if (templateConfig.layers && templateConfig.layers.length > 0) {
       console.log(chalk.blue("📦 Layers:"));
@@ -211,8 +218,9 @@ async function deployLambda(options: DeployOptions) {
         console.log(chalk.blue(`   ${index + 1}. ${layer}`));
       });
     }
-  } catch (error: any) {
-    spinner.fail(`❌ Deployment failed: ${error.message || error}`);
+  } catch (error: unknown) {
+    const err = error as Error;
+    spinner.fail(`❌ Deployment failed: ${err.message || error}`);
     throw error;
   }
 }
