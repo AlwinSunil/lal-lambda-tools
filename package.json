@@ -14,6 +14,7 @@
     "dev": "nodemon --exec npx tsx src/index.ts",
     "dev:watch": "nodemon --watch src --ext ts --exec tsx src/index.ts",
     "build": "tsc && node -e \"require('fs-extra').ensureDirSync('dist/templates')\" && node -e \"require('fs-extra').copySync('src/templates', 'dist/templates')\" && node -e \"require('fs-extra').copySync('package.json', 'dist/package.json')\"",
+    "format": "prettier --write \"src/**/*.ts\"",
     "start": "node dist/index.js",
     "prepare": "npm run build",
     "link": "npm link",
@@ -38,6 +39,8 @@
     "fs-extra": "^11.3.0",
     "liquidjs": "^10.21.1",
     "ora": "^8.2.0",
+    "prompts": "^2.4.2",
+    "smol-toml": "^1.4.2",
     "yaml": "^2.8.0",
     "zod": "^3.25.56"
   },
@@ -45,7 +48,9 @@
     "@types/adm-zip": "^0.5.7",
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^22.15.29",
+    "@types/prompts": "^2.4.9",
     "nodemon": "^3.1.10",
+    "prettier": "^3.6.2",
     "typescript": "^5.8.3"
   }
 }

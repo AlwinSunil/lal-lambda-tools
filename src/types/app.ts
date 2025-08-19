@@ -26,6 +26,14 @@ export interface FetchOptions {
   output: string;
 }
 
+export interface UpgradeOptions {
+  profile: string;
+  region: string;
+  targetRuntime: string; // e.g., "python3.12"
+  all?: boolean; // upgrade all python functions found
+  include?: string[]; // specific function names to upgrade
+}
+
 export interface SAMTemplate {
   AWSTemplateFormatVersion?: string;
   Transform?: string;

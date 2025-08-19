@@ -9,7 +9,8 @@ import { Command } from "commander";
 import { createTemplate } from "./commands/create-template";
 import { deployLambda } from "./commands/deploy";
 import { fetchLambda } from "./commands/fetch";
-import { CreateOptions, DeployOptions, FetchOptions } from "./types/app";
+import { upgradeRuntimes } from "./commands/upgrade";
+import { CreateOptions, DeployOptions, FetchOptions, UpgradeOptions } from "./types/app";
 
 // Read version from package.json
 const packageJson = JSON.parse(readFileSync(join(__dirname, "../package.json"), "utf8"));
@@ -28,6 +29,7 @@ ${chalk.cyan("Commands:")}
   ${chalk.white("create <name>")}    Create Lambda function template
   ${chalk.white("deploy")}           Deploy Lambda function with SAM
   ${chalk.white("fetch <name>")}     Download Lambda function from AWS
+  ${chalk.white("upgrade")}          Upgrade Python runtimes for selected Lambdas
 
 ${chalk.cyan("Global Options:")}
   ${chalk.white("--profile")}        AWS CLI profile (default: default)
@@ -35,10 +37,13 @@ ${chalk.cyan("Global Options:")}
 
 ${chalk.cyan("Quick Examples:")}
   ${chalk.dim("$")} ${chalk.green(
-      "lal-lambda-tools create UserAuth --stack-name my-stack --role arn:aws:iam::123456789012:role/lambda-role",
-    )}
+    "lal-lambda-tools create UserAuth --stack-name my-stack --role arn:aws:iam::123456789012:role/lambda-role",
+  )}
   ${chalk.dim("$")} ${chalk.green("lal-lambda-tools deploy --profile dev")}
   ${chalk.dim("$")} ${chalk.green("lal-lambda-tools fetch UserAuth --region us-west-2 --profile lal-devops")}
+  ${chalk.dim("$")} ${chalk.green(
+    "lal-lambda-tools upgrade --profile lal-devops --region us-east-2 --target-runtime python3.12",
+  )}
 
 ${chalk.dim("Run 'lal-lambda-tools <command> --help' for specific options")}
 `,
@@ -175,6 +180,37 @@ ${chalk.cyan("Process:")}
       await fetchLambda(name, options);
     } catch (error) {
       console.error(chalk.red(`❌ Error fetching function: ${error}`));
+      process.exit(1);
+    }
+  });
+
+// Upgrade command
+program
+  .command("upgrade")
+  .description("List Python Lambdas and upgrade selected to a target Python runtime")
+  .option("--profile <name>", "AWS CLI profile", "default")
+  .option("--region <region>", "AWS region", "us-east-2")
+  .requiredOption("--target-runtime <runtime>", "Target runtime, e.g., python3.12")
+  .option("--all", "Upgrade all Python functions found")
+  .option("--include <names...>", "Specific function names to upgrade (space-separated)")
+  .addHelpText(
+    "after",
+    `
+${chalk.cyan("Examples:")}
+  ${chalk.green("lal-lambda-tools upgrade --profile lal-devops --region us-east-2 --target-runtime python3.12")}
+  ${chalk.green("lal-lambda-tools upgrade --profile lal-devops --target-runtime python3.12 --include MyFnA MyFnB")}
+
+${chalk.cyan("What it does:")}
+  1. Uses AWS CLI to list functions with runtimes
+  2. Filters Python functions and lets you choose which to upgrade
+  3. Runs aws lambda update-function-configuration per selection and waits until the update completes
+`,
+  )
+  .action(async (options: UpgradeOptions) => {
+    try {
+      await upgradeRuntimes(options);
+    } catch (error) {
+      console.error(chalk.red(`❌ Upgrade failed: ${error}`));
       process.exit(1);
     }
   });
