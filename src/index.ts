@@ -13,6 +13,7 @@ import { upgradeRuntimes } from "./commands/upgrade";
 import { listFunctionsWithLayers } from "./commands/list-layers";
 import { listFunctions } from "./commands/list-functions";
 import { CreateOptions, DeployOptions, FetchOptions, UpgradeOptions } from "./types/app";
+import { DEFAULT_REGION, DEFAULT_PROFILE } from "./constants";
 
 // Read version from package.json
 const packageJson = JSON.parse(readFileSync(join(__dirname, "../package.json"), "utf8"));
@@ -36,8 +37,8 @@ ${chalk.cyan("Commands:")}
   ${chalk.white("list-layers")}      List Lambda functions that use Layers
 
 ${chalk.cyan("Global Options:")}
-  ${chalk.white("--profile")}        AWS CLI profile (default: default)
-  ${chalk.white("--region")}         AWS region (default: us-east-2)
+  ${chalk.white("--profile")}        AWS CLI profile (default: ${DEFAULT_PROFILE})
+  ${chalk.white("--region")}         AWS region (default: ${DEFAULT_REGION})
 
 ${chalk.cyan("Quick Examples:")}
   ${chalk.dim("$")} ${chalk.green(
@@ -45,9 +46,7 @@ ${chalk.cyan("Quick Examples:")}
   )}
   ${chalk.dim("$")} ${chalk.green("lal-lambda-tools deploy --profile dev")}
   ${chalk.dim("$")} ${chalk.green("lal-lambda-tools fetch UserAuth --region us-west-2 --profile lal-devops")}
-  ${chalk.dim("$")} ${chalk.green(
-    "lal-lambda-tools upgrade --profile lal-devops --region us-east-2 --target-runtime python3.12",
-  )}
+  ${chalk.dim("$")} ${chalk.green(`lal-lambda-tools upgrade --profile lal-devops --region ${DEFAULT_REGION} --target-runtime python3.12`)}
 
 ${chalk.dim("Run 'lal-lambda-tools <command> --help' for specific options")}
 `,
@@ -62,8 +61,8 @@ program
   .requiredOption("--role <arn>", "IAM execution role ARN (required)")
   .option("--language <type>", "Language (default: python)", "python")
   .option("--output <directory>", "Output directory (default: current directory)", ".")
-  .option("--profile <name>", "AWS CLI profile", "default")
-  .option("--region <region>", "AWS region", "us-east-2")
+  .option("--profile <name>", "AWS CLI profile", DEFAULT_PROFILE)
+  .option("--region <region>", "AWS region", DEFAULT_REGION)
   .option("--layers <arns...>", "Layer ARNs to attach to the function")
   .addHelpText(
     "after",
@@ -83,13 +82,13 @@ ${chalk.cyan("Runtime Info:")}
   ${chalk.white("python")}    Python 3.9+ (default)
   ${chalk.white("nodejs")}    Node.js 18+
 
-${chalk.cyan("Required Parameters:")}
+  ${chalk.cyan("Required Parameters:")}
   • ${chalk.yellow("--stack-name")} - CloudFormation stack name (use existing or create new)
   • ${chalk.yellow("--role")} - IAM execution role ARN for the Lambda function
 
-${chalk.cyan("Optional Parameters:")}
-  • ${chalk.yellow("--profile")} - AWS CLI profile (default: default)
-  • ${chalk.yellow("--region")} - AWS region (default: us-east-2)
+  ${chalk.cyan("Optional Parameters:")}
+  • ${chalk.yellow("--profile")} - AWS CLI profile (default: ${DEFAULT_PROFILE})
+  • ${chalk.yellow("--region")} - AWS region (default: ${DEFAULT_REGION})
 
 ${chalk.cyan("IAM Role Requirements:")}
   • Must be a valid IAM role ARN
@@ -124,8 +123,8 @@ ${chalk.cyan("Template Features:")}
 program
   .command("deploy")
   .description("Deploy Lambda function to AWS")
-  .option("--profile <name>", "AWS CLI profile", "default")
-  .option("--region <region>", "AWS region", "us-east-2")
+  .option("--profile <name>", "AWS CLI profile", DEFAULT_PROFILE)
+  .option("--region <region>", "AWS region", DEFAULT_REGION)
   .option("--function-name <name>", "Override function name")
   .option("--role <arn>", "IAM execution role ARN")
   .option("--status-only", "Check deployment status only")
@@ -162,8 +161,8 @@ program
   .command("fetch")
   .description("Download Lambda function from AWS")
   .argument("<name>", "Function name")
-  .option("--profile <name>", "AWS CLI profile", "default")
-  .option("--region <region>", "AWS region", "us-east-2")
+  .option("--profile <name>", "AWS CLI profile", DEFAULT_PROFILE)
+  .option("--region <region>", "AWS region", DEFAULT_REGION)
   .option("--output <directory>", "Output directory", ".")
   .addHelpText(
     "after",
@@ -192,8 +191,8 @@ ${chalk.cyan("Process:")}
 program
   .command("upgrade")
   .description("List Python Lambdas and upgrade selected to a target Python runtime")
-  .option("--profile <name>", "AWS CLI profile", "default")
-  .option("--region <region>", "AWS region", "us-east-2")
+  .option("--profile <name>", "AWS CLI profile", DEFAULT_PROFILE)
+  .option("--region <region>", "AWS region", DEFAULT_REGION)
   .requiredOption("--target-runtime <runtime>", "Target runtime, e.g., python3.12")
   .option("--all", "Upgrade all Python functions found")
   .option("--include <names...>", "Specific function names to upgrade (space-separated)")
@@ -201,7 +200,7 @@ program
     "after",
     `
 ${chalk.cyan("Examples:")}
-  ${chalk.green("lal-lambda-tools upgrade --profile lal-devops --region us-east-2 --target-runtime python3.12")}
+  ${chalk.green(`lal-lambda-tools upgrade --profile lal-devops --region ${DEFAULT_REGION} --target-runtime python3.12`)}
   ${chalk.green("lal-lambda-tools upgrade --profile lal-devops --target-runtime python3.12 --include MyFnA MyFnB")}
 
 ${chalk.cyan("What it does:")}
@@ -223,14 +222,14 @@ ${chalk.cyan("What it does:")}
 program
   .command("list-layers")
   .description("List Lambda functions that use Layers with runtime and layer ARNs")
-  .option("--profile <name>", "AWS CLI profile", "default")
-  .option("--region <region>", "AWS region", "us-east-2")
+  .option("--profile <name>", "AWS CLI profile", DEFAULT_PROFILE)
+  .option("--region <region>", "AWS region", DEFAULT_REGION)
   .option("--runtime <runtime>", "Runtime family or target like 'python' or 'python3.12'", "python")
   .addHelpText(
     "after",
     `
 ${chalk.cyan("Examples:")}
-  ${chalk.green("lal-lambda-tools list-layers --profile lal-devops --region us-east-2")}
+  ${chalk.green(`lal-lambda-tools list-layers --profile lal-devops --region ${DEFAULT_REGION}`)}
   ${chalk.green("lal-lambda-tools list-layers --runtime python")}
   ${chalk.green("lal-lambda-tools list-layers --runtime nodejs")}
 `,
@@ -249,14 +248,14 @@ ${chalk.cyan("Examples:")}
 program
   .command("list-functions")
   .description("List Lambda functions in a simple table; optionally filter by runtime family")
-  .option("--profile <name>", "AWS CLI profile", "default")
-  .option("--region <region>", "AWS region", "us-east-2")
+  .option("--profile <name>", "AWS CLI profile", DEFAULT_PROFILE)
+  .option("--region <region>", "AWS region", DEFAULT_REGION)
   .option("--runtime <runtime>", "Runtime family or target like 'python' or 'nodejs'")
   .addHelpText(
     "after",
     `
 ${chalk.cyan("Examples:")}
-  ${chalk.green("lal-lambda-tools list-functions --profile lal-devops --region us-east-2")}
+  ${chalk.green(`lal-lambda-tools list-functions --profile lal-devops --region ${DEFAULT_REGION}`)}
   ${chalk.green("lal-lambda-tools list-functions --runtime python")}
   ${chalk.green("lal-lambda-tools list-functions --runtime nodejs")}
 `,

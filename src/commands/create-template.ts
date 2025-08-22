@@ -10,6 +10,7 @@ import ora from "ora";
 import { z } from "zod";
 
 import { generateResourceName } from "../helpers/generateResourceName";
+import { DEFAULT_PROFILE, DEFAULT_REGION } from "../constants";
 import { SupportedLanguage } from "../types/app";
 
 // Zod schema for create template validation
@@ -51,8 +52,8 @@ async function createTemplate(
     layers,
     stackName,
     role,
-    profile: profile || "default",
-    region: region || "us-east-2",
+    profile: profile || DEFAULT_PROFILE,
+    region: region || DEFAULT_REGION,
   });
 
   if (!validationResult.success) {

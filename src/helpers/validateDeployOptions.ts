@@ -4,6 +4,7 @@ import { GetCallerIdentityCommand, STSClient } from "@aws-sdk/client-sts";
 import { fromIni } from "@aws-sdk/credential-providers";
 
 import { DeployOptions } from "../types/app";
+import { DEFAULT_PROFILE, DEFAULT_REGION } from "../constants";
 
 const AWS_REGIONS = [
   "us-east-1",
@@ -38,7 +39,16 @@ const DeployOptionsSchema = z.object({
 });
 
 export async function validateDeployOptions(options: DeployOptions): Promise<void> {
-  const result = DeployOptionsSchema.safeParse(options);
+  // apply defaults similar to CLI: profile and region should have sensible defaults
+  const optsWithDefaults = {
+    profile: options.profile || DEFAULT_PROFILE,
+    region: options.region || DEFAULT_REGION,
+    functionName: options.functionName,
+    role: options.role,
+    statusOnly: options.statusOnly,
+  };
+
+  const result = DeployOptionsSchema.safeParse(optsWithDefaults);
   if (!result.success) {
     const errors = result.error.errors.map((e) => e.message).join(", ");
     throw new Error(`Deploy options validation failed: ${errors}`);
@@ -46,8 +56,10 @@ export async function validateDeployOptions(options: DeployOptions): Promise<voi
 
   // AWS credentials and profile validation
   try {
-    const credentials = options.profile !== "default" ? await fromIni({ profile: options.profile }) : undefined;
-    const stsClient = new STSClient({ region: options.region, credentials });
+    const profileToUse = optsWithDefaults.profile;
+    const regionToUse = optsWithDefaults.region;
+    const credentials = profileToUse !== DEFAULT_PROFILE ? await fromIni({ profile: profileToUse }) : undefined;
+    const stsClient = new STSClient({ region: regionToUse, credentials });
 
     const identity = await stsClient.send(new GetCallerIdentityCommand({}));
 
