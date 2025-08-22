@@ -10,6 +10,8 @@ import { createTemplate } from "./commands/create-template";
 import { deployLambda } from "./commands/deploy";
 import { fetchLambda } from "./commands/fetch";
 import { upgradeRuntimes } from "./commands/upgrade";
+import { listFunctionsWithLayers } from "./commands/list-layers";
+import { listFunctions } from "./commands/list-functions";
 import { CreateOptions, DeployOptions, FetchOptions, UpgradeOptions } from "./types/app";
 
 // Read version from package.json
@@ -30,6 +32,8 @@ ${chalk.cyan("Commands:")}
   ${chalk.white("deploy")}           Deploy Lambda function with SAM
   ${chalk.white("fetch <name>")}     Download Lambda function from AWS
   ${chalk.white("upgrade")}          Upgrade Python runtimes for selected Lambdas
+  ${chalk.white("list-functions")}   List Lambda functions (optionally filter by runtime)
+  ${chalk.white("list-layers")}      List Lambda functions that use Layers
 
 ${chalk.cyan("Global Options:")}
   ${chalk.white("--profile")}        AWS CLI profile (default: default)
@@ -211,6 +215,57 @@ ${chalk.cyan("What it does:")}
       await upgradeRuntimes(options);
     } catch (error) {
       console.error(chalk.red(`❌ Upgrade failed: ${error}`));
+      process.exit(1);
+    }
+  });
+
+// list-layers command
+program
+  .command("list-layers")
+  .description("List Lambda functions that use Layers with runtime and layer ARNs")
+  .option("--profile <name>", "AWS CLI profile", "default")
+  .option("--region <region>", "AWS region", "us-east-2")
+  .option("--runtime <runtime>", "Runtime family or target like 'python' or 'python3.12'", "python")
+  .addHelpText(
+    "after",
+    `
+${chalk.cyan("Examples:")}
+  ${chalk.green("lal-lambda-tools list-layers --profile lal-devops --region us-east-2")}
+  ${chalk.green("lal-lambda-tools list-layers --runtime python")}
+  ${chalk.green("lal-lambda-tools list-layers --runtime nodejs")}
+`,
+  )
+  .action(async (options) => {
+    try {
+      // ensure runtime option exists for typing
+      await listFunctionsWithLayers({ profile: options.profile, region: options.region, runtime: options.runtime });
+    } catch (error) {
+      console.error(chalk.red(`❌ list-layers failed: ${error}`));
+      process.exit(1);
+    }
+  });
+
+// list-functions command (simple table output)
+program
+  .command("list-functions")
+  .description("List Lambda functions in a simple table; optionally filter by runtime family")
+  .option("--profile <name>", "AWS CLI profile", "default")
+  .option("--region <region>", "AWS region", "us-east-2")
+  .option("--runtime <runtime>", "Runtime family or target like 'python' or 'nodejs'")
+  .addHelpText(
+    "after",
+    `
+${chalk.cyan("Examples:")}
+  ${chalk.green("lal-lambda-tools list-functions --profile lal-devops --region us-east-2")}
+  ${chalk.green("lal-lambda-tools list-functions --runtime python")}
+  ${chalk.green("lal-lambda-tools list-functions --runtime nodejs")}
+`,
+  )
+  .action(async (options) => {
+    try {
+      await listFunctions({ profile: options.profile, region: options.region, runtime: options.runtime });
+    } catch (error) {
+      console.error(chalk.red(`❌ list-functions failed: ${error}`));
       process.exit(1);
     }
   });

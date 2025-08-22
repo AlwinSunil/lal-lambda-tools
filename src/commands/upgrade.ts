@@ -1,95 +1,18 @@
-import { exec } from "child_process";
-import { promisify } from "util";
-
 import chalk from "chalk";
 import ora from "ora";
 import prompts from "prompts";
 
 import { UpgradeOptions } from "../types/app";
 import { validateDeployOptions } from "../helpers/validateDeployOptions";
-
-const execPromise = promisify(exec);
-
-// Small helper to run aws cli and return parsed JSON (when expected)
-async function runAws<T = any>(command: string, expectJson = true): Promise<T | string> {
-  const { stdout, stderr } = await execPromise(command, { maxBuffer: 10 * 1024 * 1024 });
-  if (stderr && stderr.trim().length > 0) {
-    // aws sometimes writes progress to stderr; don't fail on it unless no stdout
-    // we'll log it in verbose future; ignore for now
-  }
-  return expectJson ? (JSON.parse(stdout) as T) : stdout;
-}
-
-function buildBaseAws(prefix: string, profile: string, region: string | undefined): string {
-  let cmd = prefix;
-  if (region) cmd += ` --region ${region}`;
-  if (profile) cmd += ` --profile ${profile}`;
-  return cmd;
-}
-
-function getRuntimeFamily(rt?: string | null): string | null {
-  if (!rt) return null;
-  const s = rt.toLowerCase();
-  // Common AWS Lambda runtime families
-  // examples: python3.12, nodejs20.x, java11, dotnet6, ruby3.2, go1.x, provided.al2
-  if (s.startsWith("python")) return "python";
-  if (s.startsWith("nodejs")) return "nodejs";
-  return s.split(/\d|\.|-/)[0] || s; // fallback: prefix before first digit/dot/hyphen
-}
-
-function isFamily(runtime: string | undefined, family: string): boolean {
-  const f = getRuntimeFamily(runtime);
-  return f === family;
-}
-
-// Extensible runtime validation: add new families with pattern and example
-function validateAndGetRuntimeFamily(targetRuntime: string): string {
-  const rules: Array<{ family: string; pattern: RegExp; example: string }> = [
-    { family: "python", pattern: /^python3\.\d+$/, example: "python3.12" },
-    { family: "nodejs", pattern: /^nodejs\d+\.x$/, example: "nodejs20.x" },
-  ];
-
-  const family = getRuntimeFamily(targetRuntime) || "unknown";
-
-  // Only support families we have rules for
-  const rule = rules.find((r) => r.family === family);
-  if (!rule) {
-    throw new Error(`Unsupported runtime '${targetRuntime}'. Only python and nodejs are supported.`);
-  }
-
-  if (!rule.pattern.test(targetRuntime)) {
-    throw new Error(`Invalid target runtime '${targetRuntime}'. Expected ${rule.family} format like '${rule.example}'`);
-  }
-
-  return family;
-}
-
-async function waitForUpdate(
-  name: string,
-  profile: string,
-  region: string | undefined,
-  timeoutMs = 1 * 60 * 1000,
-  initialIntervalMs = 1000,
-  maxIntervalMs = 5000,
-): Promise<{ status: string; reason?: string }> {
-  const start = Date.now();
-  let intervalMs = initialIntervalMs;
-  while (Date.now() - start < timeoutMs) {
-    const cmd = buildBaseAws(`aws lambda get-function-configuration --function-name ${name}`, profile, region);
-    try {
-      const cfg: any = await runAws<any>(cmd, true);
-      const status: string = cfg.LastUpdateStatus || "Unknown";
-      if (status === "Successful") return { status };
-      if (status === "Failed") return { status, reason: cfg.LastUpdateStatusReason };
-    } catch (e: any) {
-      return { status: "Failed", reason: e?.message || String(e) };
-    }
-    await new Promise((r) => setTimeout(r, intervalMs));
-    // exponential backoff: increase interval but cap at maxIntervalMs
-    intervalMs = Math.min(Math.floor(intervalMs * 1.5), maxIntervalMs);
-  }
-  return { status: "Timeout", reason: `Waited ${Math.round(timeoutMs / 1000)}s` };
-}
+import {
+  buildBaseAws,
+  getLastInvocation,
+  getRuntimeFamily,
+  isFamily,
+  runAws,
+  validateAndGetRuntimeFamily,
+  waitForUpdate,
+} from "../helpers/awsUtils";
 
 export async function upgradeRuntimes(options: UpgradeOptions): Promise<void> {
   const spinner = ora("Loading Lambda functions...").start();
@@ -101,21 +24,44 @@ export async function upgradeRuntimes(options: UpgradeOptions): Promise<void> {
     // Reuse existing validation for profile/region credentials
     await validateDeployOptions({ profile: options.profile, region: options.region });
 
-    // 1) List functions with their runtimes via AWS CLI
+    // 1) List functions with their runtimes and Layers via AWS CLI
     const listCmd =
       buildBaseAws(
-        'aws lambda list-functions --query "Functions[].{Name:FunctionName, Runtime:Runtime}"',
+        'aws lambda list-functions --query "Functions[].{Name:FunctionName, Runtime:Runtime, Layers: Layers[].Arn}"',
         options.profile,
         options.region,
       ) + " --output json"; // force json for parsing
 
-    const functions: Array<{ Name: string; Runtime?: string }> = (await runAws(listCmd)) as any;
+    const functions: Array<{ Name: string; Runtime?: string; Layers?: string[] }> = (await runAws(listCmd)) as any;
 
     // Filter candidate functions by the selected family
     const candidateFunctions = functions.filter((f) => isFamily(f.Runtime, targetFamily));
-    const runtimeByName = new Map<string, string>(
-      candidateFunctions.map((f) => [f.Name, f.Runtime || "unknown"] as [string, string]),
-    );
+
+    // Build a map of runtime + layers from the initial list result (no extra AWS calls)
+    const infoByName = new Map<string, { runtime: string; layers: string[] }>();
+    for (const f of candidateFunctions) {
+      const runtime = f.Runtime || "unknown";
+      const layers = Array.isArray(f.Layers) ? f.Layers : [];
+      infoByName.set(f.Name, { runtime, layers });
+    }
+
+    spinner.text = "Fetching last invocation times...";
+
+    // Get last invocation times for all candidate functions (returns display + timestamp)
+    const invocationPromises = candidateFunctions.map(async (f) => ({
+      name: f.Name,
+      last: await getLastInvocation(f.Name, options.profile, options.region),
+    }));
+
+    const invocationData = await Promise.all(invocationPromises);
+    const invocationByName = new Map(invocationData.map(({ name, last }) => [name, last]));
+
+    // Sort candidateFunctions by most recent invocation first (null timestamps go to the end)
+    candidateFunctions.sort((a, b) => {
+      const ta = invocationByName.get(a.Name)?.ts || 0;
+      const tb = invocationByName.get(b.Name)?.ts || 0;
+      return (tb || 0) - (ta || 0);
+    });
 
     spinner.succeed(chalk.green(`Found ${functions.length} functions, ${candidateFunctions.length} ${targetFamily} functions`));
 
@@ -138,10 +84,16 @@ export async function upgradeRuntimes(options: UpgradeOptions): Promise<void> {
       }
     } else {
       // Interactive multi-select with prompts (checkbox)
-      const choices = candidateFunctions.map((f) => ({
-        title: `${f.Name}  ${chalk.dim(`(${f.Runtime})`)}`,
-        value: f.Name,
-      }));
+      const choices = candidateFunctions.map((f) => {
+        const info = infoByName.get(f.Name) || { runtime: "unknown", layers: [] };
+        const layersText = info.layers.length ? `, layers: ${info.layers.join(", ")}` : "";
+        const last = invocationByName.get(f.Name) || { display: "unknown", ts: null };
+
+        return {
+          title: `${f.Name} ${chalk.dim(`(last: ${last.display}, ${info.runtime}${layersText})`)}`,
+          value: f.Name,
+        };
+      });
 
       const { picked } = await prompts(
         {
@@ -170,12 +122,16 @@ export async function upgradeRuntimes(options: UpgradeOptions): Promise<void> {
 
     // Filter out functions already on the target runtime
     const targetLower = options.targetRuntime.toLowerCase();
-    const toUpgrade = selectedNames.filter((n) => (runtimeByName.get(n) || "").toLowerCase() !== targetLower);
+    const toUpgrade = selectedNames.filter((n) => ((infoByName.get(n)?.runtime || "") as string).toLowerCase() !== targetLower);
     const alreadyTarget = selectedNames.filter((n) => !toUpgrade.includes(n));
 
     if (alreadyTarget.length > 0) {
       console.log(chalk.yellow("\nSkipping functions already at target runtime:"));
-      alreadyTarget.forEach((n) => console.log(chalk.yellow(`  - ${n} (${runtimeByName.get(n)})`)));
+      alreadyTarget.forEach((n) => {
+        const info = infoByName.get(n) || { runtime: "unknown", layers: [] };
+        const layersText = info.layers && info.layers.length ? `, layers: ${info.layers.join(", ")}` : "";
+        console.log(chalk.yellow(`  - ${n} (${info.runtime}${layersText})`));
+      });
     }
 
     if (toUpgrade.length === 0) {
@@ -185,8 +141,9 @@ export async function upgradeRuntimes(options: UpgradeOptions): Promise<void> {
 
     console.log("\nPlanned upgrades:");
     toUpgrade.forEach((n) => {
-      const from = runtimeByName.get(n) || "unknown";
-      console.log(`  - ${n} (${from} -> ${options.targetRuntime})`);
+      const info = infoByName.get(n) || { runtime: "unknown", layers: [] };
+      const layersText = info.layers && info.layers.length ? `, layers: ${info.layers.join(", ")}` : "";
+      console.log(`  - ${n} (${info.runtime}${layersText} -> ${options.targetRuntime})`);
     });
 
     // 3) Confirm (interactive only)
@@ -213,7 +170,7 @@ export async function upgradeRuntimes(options: UpgradeOptions): Promise<void> {
         options.region,
       );
 
-      const fromRuntime = runtimeByName.get(name) || "unknown";
+      const fromRuntime = infoByName.get(name)?.runtime || "unknown";
       console.log(chalk.cyan(`\nUpdating ${name} (${fromRuntime} -> ${options.targetRuntime}) ...`));
       try {
         const json = (await runAws<any>(updateCmd, true)) as any;

@@ -34,6 +34,21 @@ export interface UpgradeOptions {
   include?: string[]; // specific function names to upgrade
 }
 
+export interface ListLayersOptions {
+  profile: string;
+  region: string;
+  // runtime can be a family (e.g. "python") or a specific runtime (e.g. "python3.12").
+  // CLI default will be "python" to list Python functions with layers.
+  runtime?: string;
+}
+
+export interface ListFunctionsOptions {
+  profile: string;
+  region: string;
+  // Optional runtime filter; accepts family like "python" or specific like "python3.12".
+  runtime?: string;
+}
+
 export interface SAMTemplate {
   AWSTemplateFormatVersion?: string;
   Transform?: string;

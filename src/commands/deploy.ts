@@ -9,6 +9,7 @@ import chalk from "chalk";
 import fse from "fs-extra";
 import ora from "ora";
 import YAML from "yaml";
+import { parse as parseToml } from "smol-toml";
 
 import { LambdaClient } from "@aws-sdk/client-lambda";
 import { fromIni } from "@aws-sdk/credential-providers";
@@ -67,6 +68,59 @@ async function createLambdaClient(options: DeployOptions): Promise<LambdaClient>
 }
 
 /**
+ * Check if a CloudFormation stack exists using SAM CLI
+ */
+async function checkStackExists(stackName: string, profile?: string, region?: string): Promise<boolean> {
+  try {
+    // Use CloudFormation describe-stacks as the primary method since it's most reliable
+    let cfCommand = `aws cloudformation describe-stacks --stack-name ${stackName}`;
+
+    if (profile) {
+      cfCommand += ` --profile ${profile}`;
+    }
+
+    if (region) {
+      cfCommand += ` --region ${region}`;
+    }
+
+    const { stdout: cfOutput } = await execPromise(cfCommand);
+    console.log("CloudFormation check output:", cfOutput);
+
+    // Parse the JSON output to check if stack exists and get its status
+    const result = JSON.parse(cfOutput);
+    if (result.Stacks && result.Stacks.length > 0) {
+      const stack = result.Stacks[0];
+      const stackStatus = stack.StackStatus;
+
+      // Check if stack is in a valid state for sync operations
+      const validStates = ["CREATE_COMPLETE", "UPDATE_COMPLETE", "UPDATE_ROLLBACK_COMPLETE"];
+
+      if (validStates.includes(stackStatus)) {
+        console.log(`Stack '${stackName}' found with status: ${stackStatus}`);
+        return true;
+      } else {
+        console.log(`Stack '${stackName}' found but in state: ${stackStatus} - will use deploy instead of sync`);
+        return false; // Treat as non-existent for sync purposes
+      }
+    }
+
+    return false;
+  } catch (error: any) {
+    console.log("CloudFormation check error:", error.message);
+
+    // If the error message indicates the stack doesn't exist, return false
+    if (error.message.includes("does not exist") || error.message.includes("ValidationError")) {
+      console.log(`Stack '${stackName}' does not exist`);
+      return false;
+    }
+
+    // For other errors (permissions, network, etc.), assume stack doesn't exist to be safe
+    console.log(`Assuming stack doesn't exist due to error: ${error.message}`);
+    return false;
+  }
+}
+
+/**
  * Check if AWS SAM CLI is installed
  */
 async function checkSamCliInstalled(): Promise<boolean> {
@@ -84,6 +138,43 @@ async function checkSamCliInstalled(): Promise<boolean> {
 async function checkSamConfigExists(): Promise<boolean> {
   const samConfigPath = path.join(process.cwd(), "samconfig.toml");
   return fse.pathExists(samConfigPath);
+}
+
+/**
+ * Parse samconfig.toml to get the stack name
+ */
+async function getStackNameFromSamConfig(): Promise<string | null> {
+  try {
+    const samConfigPath = path.join(process.cwd(), "samconfig.toml");
+    const samConfigContent = await fs.readFile(samConfigPath, "utf-8");
+
+    // Parse TOML content using smol-toml
+    const parsedConfig = parseToml(samConfigContent) as any;
+
+    // Navigate to [default.deploy.parameters] section
+    const defaultSection = parsedConfig?.default;
+    const deploySection = defaultSection?.deploy;
+    const parametersSection = deploySection?.parameters;
+
+    if (parametersSection && typeof parametersSection.stack_name === "string") {
+      return parametersSection.stack_name;
+    }
+
+    // Alternative structure check - sometimes the structure might be different
+    // Check if stack_name is directly in the parsed config at various levels
+    if (parsedConfig?.stack_name && typeof parsedConfig.stack_name === "string") {
+      return parsedConfig.stack_name;
+    }
+
+    if (defaultSection?.stack_name && typeof defaultSection.stack_name === "string") {
+      return defaultSection.stack_name;
+    }
+
+    return null;
+  } catch (error) {
+    console.log("Error parsing samconfig.toml:", error);
+    return null;
+  }
 }
 
 async function deployLambda(options: DeployOptions) {
@@ -132,38 +223,76 @@ async function deployLambda(options: DeployOptions) {
     // Check if samconfig.toml exists
     const samConfigExists = await checkSamConfigExists();
 
-    // Build the SAM deploy command
-    let deployCommand = "sam deploy";
-
-    // Add profile if specified
-    if (options.profile) {
-      deployCommand += ` --profile ${options.profile}`;
-    }
-
-    // If no samconfig.toml, add required parameters
-    if (!samConfigExists) {
-      spinner.info("No samconfig.toml found, will use command line parameters");
-      deployCommand += " --guided";
-    } else {
-      spinner.info("Using existing samconfig.toml for deployment configuration");
-      // With samconfig.toml, we can just use the non-interactive mode
-      deployCommand += " --no-confirm-changeset";
-    }
-
-    // Add region if specified and no samconfig.toml
-    if (options.region && !samConfigExists) {
-      deployCommand += ` --region ${options.region}`;
-    }
-
-    // Add stack name if specified and no samconfig.toml
-    if (options.functionName && !samConfigExists) {
-      deployCommand += ` --stack-name ${options.functionName}`;
-    }
-
     // Parse template to get function information for output
     spinner.text = "Parsing template.yml...";
     const templateConfig = await parseTemplate(templatePath);
     const functionName = options.functionName || templateConfig.functionName;
+
+    // Get stack name from samconfig.toml if it exists, otherwise use function name
+    let stackName = functionName; // Default to function name
+    if (samConfigExists) {
+      const configStackName = await getStackNameFromSamConfig();
+      if (configStackName) {
+        stackName = configStackName;
+        spinner.info(`Using stack name from samconfig.toml: ${stackName}`);
+      } else {
+        spinner.info(`No stack_name found in samconfig.toml, using function name: ${stackName}`);
+      }
+    } else {
+      spinner.info(`No samconfig.toml found, using function name as stack name: ${stackName}`);
+    }
+
+    // Check if the stack already exists
+    spinner.text = "Checking if stack exists...";
+    const stackExists = await checkStackExists(stackName, options.profile, options.region);
+
+    let deployCommand: string;
+
+    if (stackExists) {
+      // Use sam sync for existing stacks to avoid CloudFormation deletions
+      spinner.info(`Stack '${stackName}' exists, using sam sync for faster deployment`);
+      deployCommand = `sam sync --stack-name ${stackName} --code`;
+
+      // Add the resource ID for the Lambda function
+      deployCommand += ` --resource-id ${functionName}`;
+
+      if (options.profile) {
+        deployCommand += ` --profile ${options.profile}`;
+      }
+
+      if (options.region) {
+        deployCommand += ` --region ${options.region}`;
+      }
+    } else {
+      // Use sam deploy for new stacks
+      spinner.info(`Stack '${stackName}' does not exist, using sam deploy for initial deployment`);
+      deployCommand = "sam deploy";
+
+      // Add profile if specified
+      if (options.profile) {
+        deployCommand += ` --profile ${options.profile}`;
+      }
+
+      // If no samconfig.toml, add required parameters
+      if (!samConfigExists) {
+        deployCommand += " --guided";
+      } else {
+        // With samconfig.toml, we can just use the non-interactive mode
+        deployCommand += " --no-confirm-changeset";
+      }
+
+      // Add region if specified and no samconfig.toml
+      if (options.region && !samConfigExists) {
+        deployCommand += ` --region ${options.region}`;
+      }
+
+      // Add stack name if specified and no samconfig.toml
+      if (options.functionName && !samConfigExists) {
+        deployCommand += ` --stack-name ${options.functionName}`;
+      }
+    }
+
+    console.log(stackExists);
 
     // Execute the SAM deploy command
     spinner.text = `Deploying Lambda function using AWS SAM CLI: ${functionName}...`;

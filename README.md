@@ -11,6 +11,7 @@ npm install -g lal-lambda-tools
 ## Commands
 
 ### Create Template
+
 Generate a Lambda function template with SAM configuration:
 
 ```bash
@@ -23,6 +24,7 @@ lal-lambda-tools create MyFunction --stack-name my-stack --role arn:aws:iam::123
 - `--role` - IAM execution role ARN
 
 **Optional:**
+
 - `--language` - `python` (default) or `nodejs`
 - `--output` - Output directory (default: current)
 - `--profile` - AWS CLI profile (default: `default`)
@@ -62,8 +64,66 @@ lal-lambda-tools fetch FunctionName
 
 Downloads function code and configuration for local development.
 
+### Upgrade
+
+Upgrade Lambda function runtimes in bulk (for example updating python3.9 -> python3.12).
+
+```bash
+lal-lambda-tools upgrade --target-runtime python3.12 --profile lal-devops
+```
+
+Options:
+
+- `--target-runtime` (required) - target runtime string, e.g. `python3.12` or `nodejs20.x`
+- `--profile` - AWS CLI profile to use (default: `default`)
+- `--region` - AWS region to operate in (default: `us-east-2`)
+- `--all` - upgrade all functions that match the runtime family (non-interactive)
+- `--include` - comma-separated function names to include (non-interactive)
+
+Behavior/Notes:
+
+- Validates the provided `--target-runtime` format first and only supports the `python` and `nodejs` families.
+- By default the command will prompt interactively to select functions to upgrade. Use `--all` or `--include` to run non-interactively.
+- The command performs the `update-function-configuration --runtime` call and waits for each function's LastUpdateStatus to become `Successful` (or reports failures/timeouts).
+
+### List Functions
+
+List Lambda functions in the account/region, show runtime, attached layers, and last invocation time.
+
+```bash
+lal-lambda-tools list-functions --profile lal-devops --runtime python
+```
+
+Options:
+
+- `--profile` - AWS CLI profile to use (default: `default`)
+- `--region` - AWS region (default: `us-east-2`)
+- `--runtime` - optional substring to filter runtimes (case-insensitive). Examples: `python`, `nodejs`, `python3.12`
+
+Output:
+
+- Prints a per-function list with name, runtime, attached layer ARNs, and the last time the function was invoked (relative time). Also prints a summary of unique layers and how many functions reference each.
+
+### List Layers
+
+Show only functions that have layers attached, filtered by runtime family (python/nodejs).
+
+```bash
+lal-lambda-tools list-layers --profile lal-devops --runtime python
+```
+
+Options:
+
+- `--profile` - AWS CLI profile to use (default: `default`)
+- `--region` - AWS region (default: `us-east-2`)
+- `--runtime` - runtime family to filter by; accepts `python` or `nodejs` (defaults to `python`)
+
+Behavior/Notes:
+
+- `list-layers` focuses on functions that have layers attached and reports the unique layer ARNs and counts of functions using them. It also fetches the last invocation time to help prioritize maintenance.
+
 ## Requirements
 
-- Node.js 18+
+- Node.js 22+
 - AWS SAM CLI (for deployments)
 - Valid AWS credentials

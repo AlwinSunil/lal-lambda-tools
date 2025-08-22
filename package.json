@@ -27,7 +27,7 @@
   "author": "LiveAltLife",
   "license": "UNLICENSED",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.0.0"
   },
   "dependencies": {
     "@aws-sdk/client-lambda": "^3.825.0",
@@ -36,6 +36,7 @@
     "adm-zip": "^0.5.16",
     "chalk": "^5.4.1",
     "commander": "^14.0.0",
+    "date-fns": "^4.1.0",
     "fs-extra": "^11.3.0",
     "liquidjs": "^10.21.1",
     "ora": "^8.2.0",
