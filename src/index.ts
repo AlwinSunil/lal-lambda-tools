@@ -196,17 +196,20 @@ program
   .requiredOption("--target-runtime <runtime>", "Target runtime, e.g., python3.12")
   .option("--all", "Upgrade all Python functions found")
   .option("--include <names...>", "Specific function names to upgrade (space-separated)")
+  .option("--layer-arn <arn>", "Replace existing layers with this single Layer ARN during upgrade")
   .addHelpText(
     "after",
     `
 ${chalk.cyan("Examples:")}
   ${chalk.green(`lal-lambda-tools upgrade --profile lal-devops --region ${DEFAULT_REGION} --target-runtime python3.12`)}
   ${chalk.green("lal-lambda-tools upgrade --profile lal-devops --target-runtime python3.12 --include MyFnA MyFnB")}
+  ${chalk.green("lal-lambda-tools upgrade --target-runtime python3.12 --layer-arn arn:aws:lambda:us-east-2:123:layer:my-layer:5")}
 
 ${chalk.cyan("What it does:")}
   1. Uses AWS CLI to list functions with runtimes
   2. Filters Python functions and lets you choose which to upgrade
   3. Runs aws lambda update-function-configuration per selection and waits until the update completes
+  4. If --layer-arn is provided, replaces the function's Layers with the given ARN
 `,
   )
   .action(async (options: UpgradeOptions) => {

@@ -79,12 +79,24 @@ Options:
 - `--region` - AWS region to operate in (default: `us-east-2`)
 - `--all` - upgrade all functions that match the runtime family (non-interactive)
 - `--include` - comma-separated function names to include (non-interactive)
+ - `--layer-arn` - replace existing Layers with this single Layer ARN during the upgrade
 
 Behavior/Notes:
 
 - Validates the provided `--target-runtime` format first and only supports the `python` and `nodejs` families.
 - By default the command will prompt interactively to select functions to upgrade. Use `--all` or `--include` to run non-interactively.
 - The command performs the `update-function-configuration --runtime` call and waits for each function's LastUpdateStatus to become `Successful` (or reports failures/timeouts).
+- If `--layer-arn` is provided, the command also calls `update-function-configuration` with `--layers <ARN>`, which replaces all existing layers on the function with the specified layer. This runs even when the runtime is already on the target version (layer-only update).
+
+Examples:
+
+```bash
+# Upgrade runtime and replace layers with a single provided layer ARN
+lal-lambda-tools upgrade --target-runtime python3.12 --layer-arn arn:aws:lambda:us-east-2:123456789012:layer:my-layer:5
+
+# Only replace layers (runtime already on target): still works
+lal-lambda-tools upgrade --target-runtime python3.12 --include MyFn --layer-arn arn:aws:lambda:us-east-2:123456789012:layer:my-layer:5
+```
 
 ### List Functions
 

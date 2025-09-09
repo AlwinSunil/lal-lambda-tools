@@ -120,30 +120,59 @@ export async function upgradeRuntimes(options: UpgradeOptions): Promise<void> {
       return;
     }
 
-    // Filter out functions already on the target runtime
+    // Determine which functions need updates: runtime and/or layer changes
     const targetLower = options.targetRuntime.toLowerCase();
-    const toUpgrade = selectedNames.filter((n) => ((infoByName.get(n)?.runtime || "") as string).toLowerCase() !== targetLower);
-    const alreadyTarget = selectedNames.filter((n) => !toUpgrade.includes(n));
+    const planned: Array<{
+      name: string;
+      fromRuntime: string;
+      toRuntime: string;
+      fromLayers: string[];
+      toLayers?: string[];
+      changeRuntime: boolean;
+      changeLayers: boolean;
+    }> = [];
 
-    if (alreadyTarget.length > 0) {
-      console.log(chalk.yellow("\nSkipping functions already at target runtime:"));
-      alreadyTarget.forEach((n) => {
-        const info = infoByName.get(n) || { runtime: "unknown", layers: [] };
-        const layersText = info.layers && info.layers.length ? `, layers: ${info.layers.join(", ")}` : "";
-        console.log(chalk.yellow(`  - ${n} (${info.runtime}${layersText})`));
+    for (const n of selectedNames) {
+      const info = infoByName.get(n) || { runtime: "unknown", layers: [] };
+      const changeRuntime = (info.runtime || "").toLowerCase() !== targetLower;
+      const wantsLayer = Boolean(options.layerArn);
+      const desiredLayers = wantsLayer ? [options.layerArn as string] : undefined;
+      const changeLayers = wantsLayer ? JSON.stringify(info.layers || []) !== JSON.stringify(desiredLayers) : false;
+      planned.push({
+        name: n,
+        fromRuntime: info.runtime,
+        toRuntime: options.targetRuntime,
+        fromLayers: info.layers || [],
+        toLayers: desiredLayers,
+        changeRuntime,
+        changeLayers,
+      });
+    }
+
+    const toUpgrade = planned.filter((p) => p.changeRuntime || p.changeLayers);
+    const alreadyOk = planned.filter((p) => !p.changeRuntime && !p.changeLayers);
+
+    if (alreadyOk.length > 0) {
+      console.log(chalk.yellow("\nSkipping functions already at target state:"));
+      alreadyOk.forEach((p) => {
+        const layersText = p.fromLayers.length ? `, layers: ${p.fromLayers.join(", ")}` : "";
+        console.log(chalk.yellow(`  - ${p.name} (${p.fromRuntime}${layersText})`));
       });
     }
 
     if (toUpgrade.length === 0) {
-      console.log(chalk.yellow("All selected functions already at the target runtime. Nothing to upgrade."));
+      console.log(chalk.yellow("All selected functions already at the desired runtime/layers. Nothing to change."));
       return;
     }
 
-    console.log("\nPlanned upgrades:");
-    toUpgrade.forEach((n) => {
-      const info = infoByName.get(n) || { runtime: "unknown", layers: [] };
-      const layersText = info.layers && info.layers.length ? `, layers: ${info.layers.join(", ")}` : "";
-      console.log(`  - ${n} (${info.runtime}${layersText} -> ${options.targetRuntime})`);
+    console.log("\nPlanned updates:");
+    toUpgrade.forEach((p) => {
+      const fromLayersText = p.fromLayers.length ? p.fromLayers.join(", ") : "none";
+      const toLayersText = p.toLayers ? (p.toLayers.length ? p.toLayers.join(", ") : "none") : fromLayersText;
+      const parts: string[] = [];
+      if (p.changeRuntime) parts.push(`${p.fromRuntime} -> ${p.toRuntime}`);
+      if (p.changeLayers) parts.push(`layers: ${fromLayersText} -> ${toLayersText}`);
+      console.log(`  - ${p.name} (${parts.join("; ")})`);
     });
 
     // 3) Confirm (interactive only)
@@ -163,33 +192,33 @@ export async function upgradeRuntimes(options: UpgradeOptions): Promise<void> {
     // 4) Perform updates sequentially (clear output per function)
     const results: { name: string; ok: boolean; message?: string }[] = [];
 
-    for (const name of toUpgrade) {
-      const updateCmd = buildBaseAws(
-        `aws lambda update-function-configuration --function-name ${name} --runtime ${options.targetRuntime}`,
-        options.profile,
-        options.region,
-      );
+    for (const p of toUpgrade) {
+      const parts: string[] = [`aws lambda update-function-configuration --function-name ${p.name}`];
+      if (p.changeRuntime) parts.push(`--runtime ${options.targetRuntime}`);
+      if (options.layerArn) parts.push(`--layers ${options.layerArn}`);
+      const updateCmd = buildBaseAws(parts.join(" "), options.profile, options.region);
 
-      const fromRuntime = infoByName.get(name)?.runtime || "unknown";
-      console.log(chalk.cyan(`\nUpdating ${name} (${fromRuntime} -> ${options.targetRuntime}) ...`));
+      const fromRuntime = p.fromRuntime || "unknown";
+      const changeDesc: string[] = [];
+      if (p.changeRuntime) changeDesc.push(`${fromRuntime} -> ${options.targetRuntime}`);
+      if (p.changeLayers) changeDesc.push(`layers -> ${options.layerArn}`);
+      console.log(chalk.cyan(`\nUpdating ${p.name} (${changeDesc.join("; ")}) ...`));
       try {
         const json = (await runAws<any>(updateCmd, true)) as any;
-        // Wait by default until the update completes
-        const wait = await waitForUpdate(name, options.profile, options.region);
+        const wait = await waitForUpdate(p.name, options.profile, options.region);
         const status = wait.status;
         if (wait.reason && status !== "Successful") {
           console.log(chalk.red(`  ↳ Reason: ${wait.reason}`));
         }
-        // concise per-item status for DX
         const ok = status === "Successful";
         const line = ok
           ? chalk.green(`✔ ${json.FunctionName} -> ${json.Runtime} (${status})`)
           : chalk.red(`✖ ${json.FunctionName} -> ${json.Runtime} (${status})`);
         console.log(line);
-        results.push({ name, ok });
+        results.push({ name: p.name, ok });
       } catch (err: any) {
-        console.log(chalk.red(`Failed updating ${name}: ${err?.message || err}`));
-        results.push({ name, ok: false, message: err?.message || String(err) });
+        console.log(chalk.red(`Failed updating ${p.name}: ${err?.message || err}`));
+        results.push({ name: p.name, ok: false, message: err?.message || String(err) });
       }
     }
 
@@ -199,8 +228,8 @@ export async function upgradeRuntimes(options: UpgradeOptions): Promise<void> {
     console.log("\nSummary:");
     console.log(chalk.green(`  ✅ Success: ${ok}`));
     console.log(chalk.red(`  ❌ Failed: ${fail}`));
-    if (alreadyTarget.length > 0) {
-      console.log(chalk.yellow(`  ⏭️  Skipped (already on target): ${alreadyTarget.length}`));
+    if (alreadyOk.length > 0) {
+      console.log(chalk.yellow(`  ⏭️  Skipped (already on target): ${alreadyOk.length}`));
     }
 
     if (fail > 0) {

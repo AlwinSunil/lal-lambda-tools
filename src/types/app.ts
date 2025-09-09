@@ -32,6 +32,9 @@ export interface UpgradeOptions {
   targetRuntime: string; // e.g., "python3.12"
   all?: boolean; // upgrade all python functions found
   include?: string[]; // specific function names to upgrade
+  // Optional: replace existing layers with this single ARN when upgrading.
+  // If provided, we will set --layers to this ARN (overwriting any existing layers).
+  layerArn?: string;
 }
 
 export interface ListLayersOptions {
